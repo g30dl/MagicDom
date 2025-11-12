@@ -1,5 +1,5 @@
-pygame
+pygame==2.6.1
 SpeechRecognition
 pyaudio
-vosk
+pipwin
 numpy

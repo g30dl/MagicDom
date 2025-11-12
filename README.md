@@ -73,7 +73,7 @@ pip install -r requirements.txt
 ## ▶️ Ejecución
 
 ```bash
-python src/main.py
+python -m src.main
 ```
 
 ---
