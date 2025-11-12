@@ -3,6 +3,7 @@ Sistema de renderizado
 Dibuja la vista 3D usando los resultados del raycasting
 """
 import pygame
+import math
 from src.game.config import Config
 from src.rendering.raycaster import RayCaster, EXAMPLE_MAP
 
@@ -80,36 +81,57 @@ class Renderer:
     
     def render_minimap(self, player, position=(10, 10), scale=5):
         """
-        Renderiza un minimapa en 2D (útil para debugging)
+        Renderiza un minimapa en 2D con radio de colisión visible
         """
         minimap_surface = pygame.Surface(
             (len(self.raycaster.map[0]) * scale, len(self.raycaster.map) * scale)
         )
         minimap_surface.fill(Config.BLACK)
+        minimap_surface.set_alpha(200)  # Semi-transparente
         
         # Dibujar mapa
         for row in range(len(self.raycaster.map)):
             for col in range(len(self.raycaster.map[0])):
                 if self.raycaster.map[row][col] > 0:
+                    wall_type = self.raycaster.map[row][col]
+                    color = self.wall_colors.get(wall_type, Config.WHITE)
                     pygame.draw.rect(
                         minimap_surface,
-                        Config.WHITE,
+                        color,
+                        (col * scale, row * scale, scale, scale)
+                    )
+                else:
+                    # Dibujar piso con color más oscuro
+                    pygame.draw.rect(
+                        minimap_surface,
+                        (20, 20, 20),
                         (col * scale, row * scale, scale, scale)
                     )
         
-        # Dibujar jugador
+        # Calcular posición del jugador en el minimap
         player_map_x = int(player.x // Config.TILE_SIZE * scale)
         player_map_y = int(player.y // Config.TILE_SIZE * scale)
+        
+        # Dibujar radio de colisión del jugador
+        collision_radius_scaled = int(player.collision_radius / Config.TILE_SIZE * scale)
+        pygame.draw.circle(
+            minimap_surface,
+            (100, 100, 255, 100),  # Azul semi-transparente
+            (player_map_x, player_map_y),
+            collision_radius_scaled,
+            1
+        )
+        
+        # Dibujar jugador
         pygame.draw.circle(
             minimap_surface,
             Config.YELLOW,
             (player_map_x, player_map_y),
-            3
+            4
         )
         
         # Dibujar dirección del jugador
-        import math
-        dir_length = 10
+        dir_length = 15
         end_x = player_map_x + int(math.cos(player.angle) * dir_length)
         end_y = player_map_y + int(math.sin(player.angle) * dir_length)
         pygame.draw.line(
@@ -117,6 +139,14 @@ class Renderer:
             Config.RED,
             (player_map_x, player_map_y),
             (end_x, end_y),
+            2
+        )
+        
+        # Dibujar borde del minimap
+        pygame.draw.rect(
+            minimap_surface,
+            Config.WHITE,
+            (0, 0, minimap_surface.get_width(), minimap_surface.get_height()),
             2
         )
         

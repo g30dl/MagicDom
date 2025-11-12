@@ -32,7 +32,7 @@ class Config:
     ORANGE = (255, 165, 0)
     
     # Jugador
-    PLAYER_SPEED = 5
+    PLAYER_SPEED = 2
     PLAYER_ROT_SPEED = 0.05
     PLAYER_SIZE = 10
     
