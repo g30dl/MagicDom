@@ -31,10 +31,14 @@ class Config:
     YELLOW = (255, 255, 0)
     ORANGE = (255, 165, 0)
     
-    # Jugador
-    PLAYER_SPEED = 2
-    PLAYER_ROT_SPEED = 0.05
+    # Jugador (AJUSTADO: velocidades más apropiadas)
+    PLAYER_SPEED = 3.0  # Velocidad de movimiento (era 2)
+    PLAYER_ROT_SPEED = 0.03  # Velocidad de rotación (era 0.05)
     PLAYER_SIZE = 10
+
+    # Spawn del jugador
+    # Usar un tile específico (col, row). Si es None, se elegirá automáticamente
+    SPAWN_TILE = None  # ejemplo: (1, 1)
     
     # Configuración de voz
     VOICE_LANGUAGE = "es-ES"  # Español

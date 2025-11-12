@@ -79,13 +79,14 @@ class Player:
         Mueve al jugador usando movimiento relativo a su ángulo con colisiones.
         forward: 1 adelante, -1 atrás
         strafe: 1 derecha, -1 izquierda
+        dt: delta time en segundos
         """
         if speed is None:
             speed = self.move_speed
         
-        # Calcular desplazamiento
-        move_x = (math.cos(self.angle) * forward - math.sin(self.angle) * strafe) * speed * dt * 60
-        move_y = (math.sin(self.angle) * forward + math.cos(self.angle) * strafe) * speed * dt * 60
+        # Calcular desplazamiento (CORREGIDO: multiplicador ajustado)
+        move_x = (math.cos(self.angle) * forward - math.sin(self.angle) * strafe) * speed * dt * 100
+        move_y = (math.sin(self.angle) * forward + math.cos(self.angle) * strafe) * speed * dt * 100
         
         # Nueva posición propuesta
         new_x = self.x + move_x
@@ -104,12 +105,13 @@ class Player:
         """
         Rota al jugador.
         delta: cantidad de rotación (puede ser teclas o mouse)
+        dt: delta time en segundos
         """
         if rot_speed is None:
             rot_speed = self.rot_speed
         
-        # Aplicar rotación
-        self.angle += delta * rot_speed * dt * 60
+        # Aplicar rotación (CORREGIDO: multiplicador ajustado)
+        self.angle += delta * rot_speed * 100
         
         # Normalizar ángulo entre 0 y 2π
         self.angle = self.angle % (2 * math.pi)
@@ -119,7 +121,7 @@ class Player:
         Controla el pitch (mirar arriba/abajo).
         Limitado para evitar gimbal lock.
         """
-        self.pitch += delta
+        self.pitch += delta * 50  # CORREGIDO: añadido multiplicador
         # Limitar pitch entre -π/3 y π/3 (aprox -60° a 60°)
         max_pitch = math.pi / 3
         self.pitch = max(-max_pitch, min(max_pitch, self.pitch))

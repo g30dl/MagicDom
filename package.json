@@ -1,0 +1,23 @@
+{
+  "name": "magicdom",
+  "version": "1.0.0",
+  "description": "MagicDom es un proyecto en desarrollo que combina técnicas de **raycasting al estilo DOOM/Wolfenstein**, control tradicional con teclado y mouse, y **comandos de voz en español** para activar habilidades mágicas. El objetivo es explorar arquitectura modular en Python utilizando **Pygame**, reconocimiento de voz y técnicas gráficas clásicas.",
+  "homepage": "https://github.com/g30dl/MagicDom#readme",
+  "bugs": {
+    "url": "https://github.com/g30dl/MagicDom/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/g30dl/MagicDom.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
