@@ -21,6 +21,8 @@ class Renderer:
         
         # Calcular ancho de cada columna
         self.column_width = Config.SCREEN_WIDTH / Config.NUM_RAYS
+        # Profundidad del último frame (para oclusión de sprites)
+        self._last_rays = None
     
     def render_3d_view(self, player):
         """
@@ -42,6 +44,7 @@ class Renderer:
         
         # Obtener rayos
         rays = self.raycaster.cast_rays(player.x, player.y, player.angle)
+        self._last_rays = rays
         
         # Dibujar cada rayo como una columna vertical
         for i, (distance, wall_type, hit_x, hit_y) in enumerate(rays):
@@ -78,8 +81,63 @@ class Renderer:
                 color,
                 (x, top, self.column_width + 1, bottom - top)
             )
+
+    def render_crosshair(self, size: int = 3, color=Config.WHITE):
+        """Dibuja un punto de mira simple en el centro de la pantalla."""
+        cx = Config.SCREEN_WIDTH // 2
+        cy = Config.SCREEN_HEIGHT // 2
+        try:
+            pygame.draw.circle(self.screen, color, (cx, cy), max(1, int(size)))
+        except Exception:
+            pass
+
+    def render_spells_3d(self, player, spells):
+        """
+        Dibuja hechizos como sprites billboard simples con oclusión básica.
+        """
+        if not spells:
+            return
+        if not self._last_rays:
+            return
+
+        for s in spells:
+            try:
+                dx = s.x - player.x
+                dy = s.y - player.y
+                distance = max(1.0, (dx*dx + dy*dy) ** 0.5)
+
+                # Ángulo hacia el hechizo y diferencia con mirada
+                angle_to = math.atan2(dy, dx)
+                angle_diff = (angle_to - player.angle + math.pi) % (2 * math.pi) - math.pi
+
+                # Fuera del FOV, no dibujar
+                if abs(angle_diff) > Config.HALF_FOV:
+                    continue
+
+                # Proyección horizontal: índice de rayo
+                ray_index_f = (angle_diff + Config.HALF_FOV) / Config.DELTA_ANGLE
+                ray_index = int(max(0, min(Config.NUM_RAYS - 1, ray_index_f)))
+
+                # Oclusión: si hay pared más cercana que el hechizo, omitir
+                wall_dist = self._last_rays[ray_index][0]
+                if distance > wall_dist:
+                    continue
+
+                # Tamaño del sprite según distancia
+                sprite_h = (Config.TILE_SIZE * Config.SCREEN_HEIGHT) / distance
+                radius = int(max(3, sprite_h * 0.15))
+
+                # Posición en pantalla
+                screen_x = int((ray_index_f / Config.NUM_RAYS) * Config.SCREEN_WIDTH)
+                screen_y = int(Config.SCREEN_HEIGHT / 2)
+
+                color = getattr(s, 'color', (255, 200, 50))
+                pygame.draw.circle(self.screen, color, (screen_x, screen_y), radius)
+            except Exception:
+                # Nunca bloquear render por un hechizo
+                continue
     
-    def render_minimap(self, player, position=(10, 10), scale=5):
+    def render_minimap(self, player, position=(10, 10), scale=5, spells=None, particles=None):
         """
         Renderiza un minimapa en 2D con radio de colisión visible
         """
@@ -141,6 +199,18 @@ class Renderer:
             (end_x, end_y),
             2
         )
+        
+        # Renderizar hechizos y partículas (si existen)
+        try:
+            if spells:
+                from src.rendering.spell_renderer import SpellRenderer
+                SpellRenderer().render_on_minimap(minimap_surface, spells, scale)
+            if particles:
+                from src.rendering.particle_renderer import ParticleRenderer
+                ParticleRenderer().render_on_minimap(minimap_surface, particles, scale)
+        except Exception:
+            # Evitar que un fallo del renderizador detenga el juego
+            pass
         
         # Dibujar borde del minimap
         pygame.draw.rect(

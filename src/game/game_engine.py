@@ -12,6 +12,9 @@ from src.rendering.renderer import Renderer
 from src.entities.player import Player
 from src.input.keyboard import KeyboardHandler
 from src.input.voice_handler import VoiceHandler
+from src.entities.spells import SpellManager
+from src.entities.particles import ParticleManager
+from src.rendering.hud_hands import HUDHands
 
 
 class GameEngine:
@@ -58,6 +61,10 @@ class GameEngine:
             # Guardar el error para mostrar en HUD
             self.voice_handler = None
             self._voice_error = str(e)
+
+        # Sistema de hechizos y partículas
+        self.particles = ParticleManager()
+        self.spells = SpellManager(game_map=self.player.game_map, player=self.player, particle_manager=self.particles)
 
     def run(self):
         """Loop principal del juego"""
@@ -123,6 +130,22 @@ class GameEngine:
         # Actualizar jugador
         self.player.update(dt)
 
+        # Actualizar hechizos y partículas
+        try:
+            self.spells.update(dt)
+            self.particles.update(dt)
+        except Exception:
+            pass
+
+        # Actualizar HUD de manos
+        try:
+            if not hasattr(self, 'hud_hands') or self.hud_hands is None:
+                from src.rendering.hud_hands import HUDHands
+                self.hud_hands = HUDHands()
+            self.hud_hands.update(dt)
+        except Exception:
+            pass
+
     def update_pause(self):
         """Actualiza lógica de pausa"""
         keys = pygame.key.get_pressed()
@@ -158,9 +181,34 @@ class GameEngine:
         """Renderiza el juego"""
         # Renderizar vista 3D
         self.renderer.render_3d_view(self.player)
+        # Dibujar hechizos en 3D (bola de fuego visible hasta colisión)
+        try:
+            self.renderer.render_spells_3d(self.player, self.spells.get_active_spells())
+        except Exception:
+            pass
+
+        # HUD de manos
+        try:
+            if hasattr(self, 'hud_hands') and self.hud_hands is not None:
+                self.hud_hands.draw(self.screen)
+        except Exception:
+            pass
+
+        # Punto de mira (dot) en el centro
+        try:
+            self.renderer.render_crosshair(size=3, color=Config.WHITE)
+        except Exception:
+            pass
 
         # Renderizar minimap (útil para debug)
-        self.renderer.render_minimap(self.player, position=(10, 10), scale=5)
+        try:
+            self.renderer.render_minimap(
+                self.player, position=(10, 10), scale=5,
+                spells=self.spells.get_active_spells(),
+                particles=self.particles.get_particles(),
+            )
+        except Exception:
+            self.renderer.render_minimap(self.player, position=(10, 10), scale=5)
 
         # Renderizar HUD simple
         health_text = self.small_font.render(
@@ -251,3 +299,17 @@ class GameEngine:
         with self._voice_lock:
             for p in parts:
                 self.recognized_words.append(p)
+        # Intentar castear hechizo a partir del texto (solo fireball de momento)
+        try:
+            if self.voice_handler:
+                spell_name = self.voice_handler.text_to_spell(text.lower())
+                if spell_name == "fireball":
+                    self.spells.cast_spell(spell_name)
+                    # animación de manos al castear
+                    try:
+                        if hasattr(self, 'hud_hands') and self.hud_hands is not None:
+                            self.hud_hands.trigger_cast()
+                    except Exception:
+                        pass
+        except Exception:
+            pass

@@ -1,17 +1,16 @@
 """
 Paquete de entidades del juego.
 
-Exporta los módulos que contienen las entidades (player, enemy, spell).
-Importamos módulos para no forzar la carga de clases que todavía puedan
-estar vacías.
+Evitar importaciones ansiosas para no provocar ciclos durante la carga.
+Importa submódulos directamente donde se necesiten:
+  from src.entities.player import Player
+  from src.entities.enemy import Enemy
+  from src.entities.spell import Spell
 """
 
-from . import player
-from . import enemy
-from . import spell
-
 __all__ = [
-	'player',
-	'enemy',
-	'spell',
+    'player',
+    'enemy',
+    'spell',
 ]
+

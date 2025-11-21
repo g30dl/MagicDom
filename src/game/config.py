@@ -18,7 +18,7 @@ class Config:
     DELTA_ANGLE = FOV / NUM_RAYS
     
     # Tamaño del mapa
-    TILE_SIZE = 64
+    TILE_SIZE = 128
     
     # Colores
     BLACK = (0, 0, 0)
@@ -32,8 +32,8 @@ class Config:
     ORANGE = (255, 165, 0)
     
     # Jugador (AJUSTADO: velocidades más apropiadas)
-    PLAYER_SPEED = 3.0  # Velocidad de movimiento (era 2)
-    PLAYER_ROT_SPEED = 0.03  # Velocidad de rotación (era 0.05)
+    PLAYER_SPEED = 2.0  # Velocidad de movimiento (era 2)
+    PLAYER_ROT_SPEED = 0.05  # Velocidad de rotación (era 0.05)
     PLAYER_SIZE = 10
 
     # Spawn del jugador
@@ -78,3 +78,19 @@ class Config:
     # Configuración de audio
     MUSIC_VOLUME = 0.3
     SFX_VOLUME = 0.7
+
+    # HUD de manos (escala y posicionamiento)
+    # - HEIGHT_RATIO: fracción del alto de pantalla usada para el sprite
+    # - MAX_WIDTH_RATIO: fracción del ancho máximo permitido (clamp)
+    # - BOTTOM_OFFSET: píxeles desde el borde inferior; negativo permite que se salga por abajo
+    # - CENTER_OFFSET_X: desplazamiento horizontal (izquierda/ derecha)
+    HUD_HANDS_HEIGHT_RATIO = 0.85
+    HUD_HANDS_MAX_WIDTH_RATIO = 0.98
+    HUD_HANDS_BOTTOM_OFFSET = -40
+    HUD_HANDS_CENTER_OFFSET_X = 0
+    # Anclaje horizontal: 'center' | 'right' | 'left'
+    HUD_HANDS_ANCHOR = 'right'
+    # Si HUD_HANDS_ANCHOR = 'right', overflow positivo hace que se salga por la derecha
+    HUD_HANDS_RIGHT_OVERFLOW = 120
+    # Si HUD_HANDS_ANCHOR = 'left', offset desde el borde izquierdo (puede ser negativo)
+    HUD_HANDS_LEFT_OFFSET = 0
