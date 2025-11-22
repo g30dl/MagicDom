@@ -19,6 +19,9 @@ class Fireball(SpellBase):
             color=(255, 120, 40),
         )
         self.radius = 8
+        # Velocidad fija en el momento de castear (no sigue rotaciones posteriores)
+        self.vx = math.cos(self.angle) * self.speed * 100
+        self.vy = math.sin(self.angle) * self.speed * 100
 
     def update(self, dt: float, context):
         # Consumir lifetime y detener si expiró
@@ -26,8 +29,8 @@ class Fireball(SpellBase):
         if not self.alive:
             return
         # Avanzar en línea recta
-        self.x += math.cos(self.angle) * self.speed * dt * 100
-        self.y += math.sin(self.angle) * self.speed * dt * 100
+        self.x += self.vx * dt
+        self.y += self.vy * dt
 
         # Chequear colisión con pared (tile != 0)
         game_map = context.get('game_map')
@@ -53,9 +56,21 @@ class Fireball(SpellBase):
                 break
 
     def on_hit_wall(self, context):
+        game_map = context.get('game_map')
+        destroyed = False
+        if game_map is not None:
+            col = int(self.x // Config.TILE_SIZE)
+            row = int(self.y // Config.TILE_SIZE)
+            # Evitar tocar el borde exterior
+            if 0 < row < len(game_map) - 1 and 0 < col < len(game_map[0]) - 1:
+                if game_map[row][col] == 4:
+                    game_map[row][col] = 0  # Romper pared destructible
+                    destroyed = True
+
         particles = context.get('particles')
         if particles is not None:
-            particles.spawn_explosion(self.x, self.y, color=(255, 120, 40))
+            color = (255, 180, 80) if destroyed else (255, 120, 40)
+            particles.spawn_explosion(self.x, self.y, color=color)
         # SFX
         snd = context.get('sound')
         if snd:

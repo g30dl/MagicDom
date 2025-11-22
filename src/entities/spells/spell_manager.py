@@ -1,6 +1,7 @@
 """
 Gestor de hechizos activos. Permite castear por nombre y actualiza sus efectos.
 """
+import math
 from typing import List
 from .fireball import Fireball
 from .lightning import Lightning
@@ -24,8 +25,11 @@ class SpellManager:
         if self.active_spells:
             return None
 
-        x, y = self.player.x, self.player.y
         angle = self.player.angle
+        # Spawn ligeramente delante del jugador para evitar autocolisión
+        spawn_offset = getattr(self.player, "collision_radius", 20) * 1.5
+        x = self.player.x + math.cos(angle) * spawn_offset
+        y = self.player.y + math.sin(angle) * spawn_offset
 
         spell = None
         if spell_name == "fireball":

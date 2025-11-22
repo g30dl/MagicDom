@@ -18,6 +18,8 @@ class Config:
     NUM_RAYS = max(BASE_NUM_RAYS, int(SCREEN_WIDTH / 4))
     MAX_DEPTH = 800  # Distancia máxima de visión
     DELTA_ANGLE = FOV / NUM_RAYS
+    # Factor de shearing vertical para mirar arriba/abajo (pitch)
+    PITCH_SHEAR_FACTOR = 0.15
     
     # Tamaño del mapa
     TILE_SIZE = 128

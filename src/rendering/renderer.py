@@ -17,6 +17,7 @@ class Renderer:
             1: (100, 100, 100),  # Gris
             2: (150, 75, 0),     # Marrón
             3: (0, 100, 150),    # Azul oscuro
+            4: (180, 120, 40),   # Pared destructible
         }
         
         # Calcular ancho de cada columna
@@ -28,18 +29,26 @@ class Renderer:
         """
         Renderiza la vista 3D desde la perspectiva del jugador
         """
-        # Dibujar cielo (mitad superior)
+        # Shearing vertical según pitch: desplaza el horizonte
+        shear_factor = getattr(Config, "PITCH_SHEAR_FACTOR", 0.25)
+        try:
+            shear_offset = math.tan(getattr(player, "pitch", 0.0)) * (Config.SCREEN_HEIGHT * shear_factor)
+        except Exception:
+            shear_offset = 0
+        horizon = int((Config.SCREEN_HEIGHT // 2) + shear_offset)
+        horizon = max(0, min(Config.SCREEN_HEIGHT, horizon))
+
+        # Dibujar cielo hasta el horizonte
         pygame.draw.rect(
             self.screen,
             (50, 50, 100),  # Azul oscuro
-            (0, 0, Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT // 2)
+            (0, 0, Config.SCREEN_WIDTH, horizon)
         )
-        
-        # Dibujar piso (mitad inferior)
+        # Dibujar piso desde el horizonte
         pygame.draw.rect(
             self.screen,
             (30, 30, 30),  # Gris oscuro
-            (0, Config.SCREEN_HEIGHT // 2, Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT // 2)
+            (0, horizon, Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT - horizon)
         )
         
         # Obtener rayos
@@ -58,7 +67,7 @@ class Renderer:
             wall_height = (Config.TILE_SIZE * Config.SCREEN_HEIGHT) / distance
             
             # Calcular posición vertical
-            top = (Config.SCREEN_HEIGHT - wall_height) // 2
+            top = horizon - wall_height // 2
             bottom = top + wall_height
             
             # Limitar al tamaño de pantalla
@@ -106,6 +115,13 @@ class Renderer:
         if not self._last_rays:
             return
 
+        shear_factor = getattr(Config, "PITCH_SHEAR_FACTOR", 0.25)
+        try:
+            shear_offset = math.tan(getattr(player, "pitch", 0.0)) * (Config.SCREEN_HEIGHT * shear_factor)
+        except Exception:
+            shear_offset = 0
+        horizon = int((Config.SCREEN_HEIGHT // 2) + shear_offset)
+
         for s in spells:
             try:
                 dx = s.x - player.x
@@ -135,7 +151,7 @@ class Renderer:
 
                 # Posición en pantalla
                 screen_x = int((ray_index_f / Config.NUM_RAYS) * Config.SCREEN_WIDTH)
-                screen_y = int(Config.SCREEN_HEIGHT / 2)
+                screen_y = horizon
 
                 color = getattr(s, 'color', (255, 200, 50))
                 pygame.draw.circle(self.screen, color, (screen_x, screen_y), radius)
