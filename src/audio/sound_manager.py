@@ -8,8 +8,15 @@ from src.game.config import Config
 
 class SoundManager:
     def __init__(self):
-        pygame.mixer.init()
-        
+        self.enabled = True
+        try:
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+        except Exception as e:
+            self.enabled = False
+            print(f"[Audio] Mixer no disponible: {e}")
+            return
+
         # Diccionarios para almacenar sonidos
         self.music_tracks = {}
         self.sound_effects = {}
@@ -18,12 +25,18 @@ class SoundManager:
         self.load_audio()
         
         # Configurar volúmenes
-        pygame.mixer.music.set_volume(Config.MUSIC_VOLUME)
+        try:
+            pygame.mixer.music.set_volume(Config.MUSIC_VOLUME)
+        except Exception as e:
+            print(f"[Audio] No se pudo ajustar volumen: {e}")
+            self.enabled = False
     
     def load_audio(self):
         """
         Carga archivos de audio desde la carpeta assets/sounds
         """
+        if not self.enabled:
+            return
         # Rutas de audio
         sounds_path = "assets/sounds"
         music_path = "assets/music"
@@ -69,6 +82,8 @@ class SoundManager:
     
     def play_sfx(self, sound_name):
         """Reproduce un efecto de sonido"""
+        if not self.enabled:
+            return
         if sound_name in self.sound_effects:
             self.sound_effects[sound_name].play()
         else:
@@ -79,6 +94,8 @@ class SoundManager:
         Reproduce música de fondo
         loops=-1 significa loop infinito
         """
+        if not self.enabled:
+            return
         if track_name in self.music_tracks:
             try:
                 pygame.mixer.music.load(self.music_tracks[track_name])
@@ -91,23 +108,28 @@ class SoundManager:
     
     def stop_music(self):
         """Detiene la música actual"""
-        pygame.mixer.music.stop()
+        if self.enabled:
+            pygame.mixer.music.stop()
     
     def pause_music(self):
         """Pausa la música actual"""
-        pygame.mixer.music.pause()
+        if self.enabled:
+            pygame.mixer.music.pause()
     
     def resume_music(self):
         """Resume la música pausada"""
-        pygame.mixer.music.unpause()
+        if self.enabled:
+            pygame.mixer.music.unpause()
     
     def set_music_volume(self, volume):
         """Ajusta el volumen de la música (0.0 a 1.0)"""
         Config.MUSIC_VOLUME = max(0.0, min(1.0, volume))
-        pygame.mixer.music.set_volume(Config.MUSIC_VOLUME)
+        if self.enabled:
+            pygame.mixer.music.set_volume(Config.MUSIC_VOLUME)
     
     def set_sfx_volume(self, volume):
         """Ajusta el volumen de los efectos de sonido (0.0 a 1.0)"""
         Config.SFX_VOLUME = max(0.0, min(1.0, volume))
-        for sound in self.sound_effects.values():
-            sound.set_volume(Config.SFX_VOLUME)
+        if self.enabled:
+            for sound in self.sound_effects.values():
+                sound.set_volume(Config.SFX_VOLUME)

@@ -9,11 +9,12 @@ from .healing import Healing
 
 
 class SpellManager:
-    def __init__(self, game_map, player, particle_manager=None):
+    def __init__(self, game_map, player, particle_manager=None, sound_manager=None):
         self.active_spells: List = []
         self.game_map = game_map
         self.player = player
         self.particles = particle_manager
+        self.sound = sound_manager
 
     def cast_spell(self, spell_name: str):
         if not spell_name:
@@ -38,13 +39,17 @@ class SpellManager:
 
         if spell is not None:
             self.active_spells.append(spell)
+            if self.sound:
+                self.sound.play_sfx(spell_name)
         return spell
 
-    def update(self, dt: float):
+    def update(self, dt: float, enemies=None):
         context = {
             'game_map': self.game_map,
             'player': self.player,
             'particles': self.particles,
+            'enemies': enemies or [],
+            'sound': self.sound,
         }
         for s in list(self.active_spells):
             s.update(dt, context)

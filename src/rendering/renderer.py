@@ -47,7 +47,7 @@ class Renderer:
         self._last_rays = rays
         
         # Dibujar cada rayo como una columna vertical
-        for i, (distance, wall_type, hit_x, hit_y) in enumerate(rays):
+        for i, (distance, wall_type, hit_x, hit_y, side) in enumerate(rays):
             if wall_type == 0:
                 continue
             
@@ -69,10 +69,16 @@ class Renderer:
             
             # Obtener color de la pared
             base_color = self.wall_colors.get(wall_type, Config.GRAY)
-            
-            # Aplicar sombreado basado en distancia
-            shade_factor = max(0.3, 1 - (distance / Config.MAX_DEPTH))
-            color = tuple(int(c * shade_factor) for c in base_color)
+
+            # "Textura" ligera: variación por impacto para evitar columnas planas
+            tex_factor = 0.9 + 0.1 * (((hit_x + hit_y) % Config.TILE_SIZE) / Config.TILE_SIZE)
+
+            # Sombreado por distancia y lado del bloque (simula luz lateral)
+            shade_factor = max(0.2, 1 - (distance / Config.MAX_DEPTH))
+            if side == 1:
+                shade_factor *= 0.75
+            shade = shade_factor * tex_factor
+            color = tuple(int(c * shade) for c in base_color)
             
             # Dibujar columna
             x = i * self.column_width

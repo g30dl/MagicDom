@@ -13,7 +13,9 @@ class Config:
     # Configuración de raycasting
     FOV = math.pi / 3  # 60 grados
     HALF_FOV = FOV / 2
-    NUM_RAYS = 120  # Cantidad de rayos (más = mejor calidad)
+    # Resolución adaptativa: más ancho => más rayos, limitado por BASE_NUM_RAYS
+    BASE_NUM_RAYS = 160
+    NUM_RAYS = max(BASE_NUM_RAYS, int(SCREEN_WIDTH / 4))
     MAX_DEPTH = 800  # Distancia máxima de visión
     DELTA_ANGLE = FOV / NUM_RAYS
     

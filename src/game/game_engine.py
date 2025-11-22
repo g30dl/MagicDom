@@ -14,6 +14,8 @@ from src.input.keyboard import KeyboardHandler
 from src.input.voice_handler import VoiceHandler
 from src.entities.spells import SpellManager
 from src.entities.particles import ParticleManager
+from src.entities.enemies.enemy import EnemyManager
+from src.audio.sound_manager import SoundManager
 from src.rendering.hud_hands import HUDHands
 
 
@@ -27,6 +29,8 @@ class GameEngine:
         self.state_manager = StateManager()
         self.renderer = Renderer(screen)
         self.keyboard_handler = KeyboardHandler()
+        self.enemy_manager = EnemyManager()
+        self.sound_manager = self._init_sound_manager()
 
         # Reconocimiento de voz (estado y buffer)
         self.voice_handler = None
@@ -64,7 +68,12 @@ class GameEngine:
 
         # Sistema de hechizos y partículas
         self.particles = ParticleManager()
-        self.spells = SpellManager(game_map=self.player.game_map, player=self.player, particle_manager=self.particles)
+        self.spells = SpellManager(
+            game_map=self.player.game_map,
+            player=self.player,
+            particle_manager=self.particles,
+            sound_manager=self.sound_manager,
+        )
 
     def run(self):
         """Loop principal del juego"""
@@ -130,9 +139,17 @@ class GameEngine:
         # Actualizar jugador
         self.player.update(dt)
 
+        # Actualizar enemigos (si hay)
+        try:
+            self.enemy_manager.update_all(dt, self.player)
+            self.enemy_manager.remove_dead()
+        except Exception:
+            pass
+
         # Actualizar hechizos y partículas
         try:
-            self.spells.update(dt)
+            enemies = self.enemy_manager.get_alive_enemies()
+            self.spells.update(dt, enemies=enemies)
             self.particles.update(dt)
         except Exception:
             pass
@@ -290,6 +307,14 @@ class GameEngine:
         fallback_x = Config.TILE_SIZE + Config.TILE_SIZE // 2
         fallback_y = Config.TILE_SIZE + Config.TILE_SIZE // 2
         return fallback_x, fallback_y
+
+    def _init_sound_manager(self):
+        """Crea un SoundManager sin romper el juego si no hay dispositivo."""
+        try:
+            return SoundManager()
+        except Exception as e:
+            print(f"[Audio] Desactivado: {e}")
+            return None
 
     # Callback ejecutado por el hilo de voz
     def _on_voice_text(self, text: str):

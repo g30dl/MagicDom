@@ -21,6 +21,8 @@ class Fireball(SpellBase):
         self.radius = 8
 
     def update(self, dt: float, context):
+        # Consumir lifetime y detener si expiró
+        super().update(dt, context)
         if not self.alive:
             return
         # Avanzar en línea recta
@@ -37,13 +39,48 @@ class Fireball(SpellBase):
                 return
             if game_map[row][col] != 0:
                 self.on_hit_wall(context)
+                return
+
+        # Colisión con enemigos si están presentes
+        enemies = context.get('enemies') or []
+        for enemy in enemies:
+            if not getattr(enemy, "alive", True):
+                continue
+            dx = enemy.x - self.x
+            dy = enemy.y - self.y
+            if (dx * dx + dy * dy) <= (self.radius * self.radius * 4):
+                self.on_hit_enemy(enemy, context)
+                break
 
     def on_hit_wall(self, context):
         particles = context.get('particles')
         if particles is not None:
             particles.spawn_explosion(self.x, self.y, color=(255, 120, 40))
+        # SFX
+        snd = context.get('sound')
+        if snd:
+            snd.play_sfx("hit")
+        self.alive = False
+
+    def on_hit_enemy(self, enemy, context):
+        try:
+            enemy.take_damage(self.damage, damage_type=self.name)
+            # knockback ligero
+            kb = 60
+            enemy.x += math.cos(self.angle) * kb
+            enemy.y += math.sin(self.angle) * kb
+        except Exception:
+            pass
+        particles = context.get('particles')
+        if particles is not None:
+            particles.spawn_explosion(self.x, self.y, color=(255, 80, 40))
+        snd = context.get('sound')
+        if snd:
+            snd.play_sfx("hit")
         self.alive = False
 
     def on_expire(self, context):
-        # No expira por tiempo; sólo por colisión
-        pass
+        # Pequeño destello al expirar sin colisión
+        particles = context.get('particles')
+        if particles is not None:
+            particles.spawn_explosion(self.x, self.y, color=(200, 120, 60), count=6)
