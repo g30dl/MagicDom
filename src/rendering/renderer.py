@@ -30,7 +30,7 @@ class Renderer:
             4: (180, 120, 40),
         }
 
-        self.column_width = Config.SCREEN_WIDTH / Config.NUM_RAYS
+        self.column_width = max(1, int(Config.SCREEN_WIDTH // Config.NUM_RAYS))
         self._last_rays = None
 
     def render_3d_view(self, player):
@@ -55,11 +55,14 @@ class Renderer:
                 continue
 
             min_dist = max(distance, Config.TILE_SIZE * 0.05)
-            wall_height = (Config.TILE_SIZE * Config.SCREEN_HEIGHT) / min_dist
+            proj_height = (Config.TILE_SIZE * Config.SCREEN_HEIGHT) / min_dist
 
-            top = max(0, int(horizon - wall_height // 2))
-            bottom = min(Config.SCREEN_HEIGHT, int(top + wall_height))
-            column_height = int(bottom - top)
+            top = horizon - proj_height / 2
+            bottom = top + proj_height
+
+            clip_top = max(0, int(top))
+            clip_bottom = min(Config.SCREEN_HEIGHT, int(bottom))
+            column_height = clip_bottom - clip_top
             if column_height <= 0:
                 continue
 
@@ -70,8 +73,25 @@ class Renderer:
             tex_x = int(tex_normalized * texture.get_width())
             tex_x = max(0, min(texture.get_width() - 1, tex_x))
 
-            tex_column = texture.subsurface((tex_x, 0, 1, texture.get_height()))
-            scaled_column = pygame.transform.scale(tex_column, (int(self.column_width) + 2, column_height))
+            tex_h = texture.get_height()
+            tex_y_start = 0.0
+            tex_y_end = float(tex_h)
+
+            if proj_height > Config.SCREEN_HEIGHT:
+                # Pared muy cerca: tomar una franja central proporcional a lo visible
+                sample_h = tex_h * (Config.SCREEN_HEIGHT / proj_height)
+                tex_y_start = (tex_h - sample_h) * 0.5
+                tex_y_end = tex_y_start + sample_h
+            elif top < 0 or bottom > Config.SCREEN_HEIGHT:
+                # Recorte por estar fuera de pantalla: mapear la parte visible
+                tex_y_start = (clip_top - top) / proj_height * tex_h
+                tex_y_end = tex_y_start + (column_height / proj_height * tex_h)
+
+            tex_y_start_i = max(0, min(tex_h - 1, int(tex_y_start)))
+            tex_sample_h = max(1, min(tex_h - tex_y_start_i, int(max(1, tex_y_end - tex_y_start))))
+
+            tex_column = texture.subsurface((tex_x, tex_y_start_i, 1, tex_sample_h))
+            scaled_column = pygame.transform.scale(tex_column, (self.column_width + 2, column_height))
 
             shade_factor = max(0.2, 1 - (min_dist / Config.MAX_DEPTH))
             if side == 1:
@@ -226,4 +246,3 @@ class Renderer:
         )
         
         self.screen.blit(minimap_surface, position)
-
