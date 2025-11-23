@@ -7,7 +7,7 @@ from src.game.config import Config
 
 class KeyboardHandler:
     def __init__(self):
-        self.mouse_sensitivity = 0.002  # REDUCIDO: era demasiado sensible
+        self.mouse_sensitivity = 0.001  # Sensibilidad reducida (X e Y)
         pygame.mouse.set_visible(True)
         pygame.event.set_grab(False)
         

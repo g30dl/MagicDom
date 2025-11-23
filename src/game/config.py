@@ -20,6 +20,17 @@ class Config:
     DELTA_ANGLE = FOV / NUM_RAYS
     # Factor de shearing vertical para mirar arriba/abajo (pitch)
     PITCH_SHEAR_FACTOR = 0.15
+
+    # Texturas de paredes
+    TEXTURE_SIZE = 256
+    WALL_TEXTURES_PATH = "assets/textures"  # pared1.png vive aqui actualmente
+    WALL_TEXTURE_MAP = {
+        1: "pared1.png",
+        # Otros tipos pueden agregarse luego; caeran en placeholder si falta archivo
+        2: "madera_oscura.png",
+        3: "magica_azul.png",
+        4: "destructible_oro.png",
+    }
     
     # Tamaño del mapa
     TILE_SIZE = 128

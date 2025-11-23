@@ -1,47 +1,40 @@
 """
-Sistema de renderizado
-Dibuja la vista 3D usando los resultados del raycasting
+Sistema de renderizado.
+Dibuja la vista 3D usando raycasting y texturas estilo DOOM.
 """
-import pygame
 import math
+import pygame
 from src.game.config import Config
 from src.rendering.raycaster import RayCaster, EXAMPLE_MAP
-from src.rendering.textures import load_texture
+from src.rendering.texture_manager import TextureManager
+
 
 class Renderer:
     def __init__(self, screen):
+        """Inicializa renderer y precarga texturas de pared."""
         self.screen = screen
         self.raycaster = RayCaster(EXAMPLE_MAP)
-        
-        # Colores para diferentes tipos de paredes
+
+        self.texture_manager = TextureManager(
+            texture_map=Config.WALL_TEXTURE_MAP,
+            base_path=Config.WALL_TEXTURES_PATH,
+            texture_size=Config.TEXTURE_SIZE,
+        )
+        self.texture_manager.load_all_textures()
+
+        # Colores de respaldo (minimapa y fallback sin textura)
         self.wall_colors = {
-            1: (100, 100, 100),  # Gris
-            2: (150, 75, 0),     # Marrón
-            3: (0, 100, 150),    # Azul oscuro
-            4: (180, 120, 40),   # Pared destructible
+            1: (100, 100, 100),
+            2: (150, 75, 0),
+            3: (0, 100, 150),
+            4: (180, 120, 40),
         }
-        self.wall_textures = {
-            1: load_texture("pared1.png"),
-        }
-        try:
-            tex_color = pygame.transform.average_color(self.wall_textures[1])
-            if hasattr(tex_color, "r"):
-                self.wall_colors[1] = (tex_color.r, tex_color.g, tex_color.b)
-            elif isinstance(tex_color, (tuple, list)):
-                self.wall_colors[1] = tuple(tex_color[:3])
-        except Exception:
-            pass
-        
-        # Calcular ancho de cada columna
+
         self.column_width = Config.SCREEN_WIDTH / Config.NUM_RAYS
-        # Profundidad del último frame (para oclusión de sprites)
         self._last_rays = None
-    
+
     def render_3d_view(self, player):
-        """
-        Renderiza la vista 3D desde la perspectiva del jugador
-        """
-        # Shearing vertical según pitch: desplaza el horizonte
+        """Renderiza la vista 3D desde la perspectiva del jugador."""
         shear_factor = getattr(Config, "PITCH_SHEAR_FACTOR", 0.25)
         try:
             shear_offset = math.tan(getattr(player, "pitch", 0.0)) * (Config.SCREEN_HEIGHT * shear_factor)
@@ -50,76 +43,52 @@ class Renderer:
         horizon = int((Config.SCREEN_HEIGHT // 2) + shear_offset)
         horizon = max(0, min(Config.SCREEN_HEIGHT, horizon))
 
-        # Dibujar cielo hasta el horizonte
-        pygame.draw.rect(
-            self.screen,
-            (50, 50, 100),  # Azul oscuro
-            (0, 0, Config.SCREEN_WIDTH, horizon)
-        )
-        # Dibujar piso desde el horizonte
-        pygame.draw.rect(
-            self.screen,
-            (30, 30, 30),  # Gris oscuro
-            (0, horizon, Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT - horizon)
-        )
-        
-        # Obtener rayos
+        # Cielo y piso
+        pygame.draw.rect(self.screen, (50, 50, 100), (0, 0, Config.SCREEN_WIDTH, horizon))
+        pygame.draw.rect(self.screen, (30, 30, 30), (0, horizon, Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT - horizon))
+
         rays = self.raycaster.cast_rays(player.x, player.y, player.angle)
         self._last_rays = rays
-        
-        # Dibujar cada rayo como una columna vertical
+
         for i, (distance, wall_type, hit_x, hit_y, side) in enumerate(rays):
             if wall_type == 0:
                 continue
-            
-            # Calcular altura de la pared basado en distancia (clamp para evitar distorsiÛn extrema al pegarse)
+
             min_dist = max(distance, Config.TILE_SIZE * 0.05)
             wall_height = (Config.TILE_SIZE * Config.SCREEN_HEIGHT) / min_dist
-            
-            # Calcular posición vertical
-            top = horizon - wall_height // 2
-            bottom = top + wall_height
-            
-            # Limitar al tamaño de pantalla
-            if top < 0:
-                top = 0
-            if bottom > Config.SCREEN_HEIGHT:
-                bottom = Config.SCREEN_HEIGHT
-            
-            # Obtener color de la pared
-            base_color = self.wall_colors.get(wall_type, Config.GRAY)
 
-            # "Textura" ligera: variación por impacto para evitar columnas planas
-            tex_factor = 0.9 + 0.1 * (((hit_x + hit_y) % Config.TILE_SIZE) / Config.TILE_SIZE)
+            top = max(0, int(horizon - wall_height // 2))
+            bottom = min(Config.SCREEN_HEIGHT, int(top + wall_height))
+            column_height = int(bottom - top)
+            if column_height <= 0:
+                continue
 
-            # Sombreado por distancia y lado del bloque (simula luz lateral)
+            texture = self.texture_manager.get_texture(wall_type)
+
+            tex_coord = hit_y if side == 0 else hit_x
+            tex_normalized = (tex_coord % Config.TILE_SIZE) / Config.TILE_SIZE
+            tex_x = int(tex_normalized * texture.get_width())
+            tex_x = max(0, min(texture.get_width() - 1, tex_x))
+
+            tex_column = texture.subsurface((tex_x, 0, 1, texture.get_height()))
+            scaled_column = pygame.transform.scale(tex_column, (int(self.column_width) + 2, column_height))
+
             shade_factor = max(0.2, 1 - (min_dist / Config.MAX_DEPTH))
             if side == 1:
                 shade_factor *= 0.75
-            shade = shade_factor * tex_factor
+
+            shade_value = max(0, min(255, int(255 * shade_factor)))
             x = i * self.column_width
-            column_height = int(bottom - top)
-
-            texture = self.wall_textures.get(wall_type)
-            if texture:
-                tex_w, tex_h = texture.get_size()
-                # Coordenada X de la textura segun el punto de impacto
-                hit_coord = hit_y if side == 0 else hit_x
-                tex_x = int((hit_coord % Config.TILE_SIZE) / Config.TILE_SIZE * tex_w)
-                tex_x = max(0, min(tex_w - 1, tex_x))
-
-                tex_column = texture.subsurface((tex_x, 0, 1, tex_h))
-                scaled_column = pygame.transform.scale(
-                    tex_column,
-                    (int(self.column_width) + 2, max(1, column_height))
-                )
-
-                shade_value = max(0, min(255, int(255 * shade)))
+            try:
                 shaded = scaled_column.copy()
-                shaded.fill((shade_value, shade_value, shade_value, 255), special_flags=pygame.BLEND_RGBA_MULT)
+                shaded.fill(
+                    (shade_value, shade_value, shade_value, 255),
+                    special_flags=pygame.BLEND_RGBA_MULT
+                )
                 self.screen.blit(shaded, (int(x), int(top)))
-            else:
-                color = tuple(int(c * shade) for c in base_color)
+            except Exception:
+                base_color = self.wall_colors.get(wall_type, Config.GRAY)
+                color = tuple(int(c * shade_factor) for c in base_color)
                 pygame.draw.rect(
                     self.screen,
                     color,
@@ -157,37 +126,30 @@ class Renderer:
                 dy = s.y - player.y
                 distance = max(1.0, (dx*dx + dy*dy) ** 0.5)
 
-                # Ángulo hacia el hechizo y diferencia con mirada
                 angle_to = math.atan2(dy, dx)
                 angle_diff = (angle_to - player.angle + math.pi) % (2 * math.pi) - math.pi
 
-                # Fuera del FOV, no dibujar
                 if abs(angle_diff) > Config.HALF_FOV:
                     continue
 
-                # Proyección horizontal: índice de rayo
                 ray_index_f = (angle_diff + Config.HALF_FOV) / Config.DELTA_ANGLE
                 ray_index = int(max(0, min(Config.NUM_RAYS - 1, ray_index_f)))
 
-                # Oclusión: si hay pared más cercana que el hechizo, omitir
                 wall_dist = self._last_rays[ray_index][0]
                 if distance > wall_dist:
                     continue
 
-                # Tamaño del sprite según distancia
                 sprite_h = (Config.TILE_SIZE * Config.SCREEN_HEIGHT) / distance
                 radius = int(max(3, sprite_h * 0.15))
 
-                # Posición en pantalla
                 screen_x = int((ray_index_f / Config.NUM_RAYS) * Config.SCREEN_WIDTH)
                 screen_y = horizon
 
                 color = getattr(s, 'color', (255, 200, 50))
                 pygame.draw.circle(self.screen, color, (screen_x, screen_y), radius)
             except Exception:
-                # Nunca bloquear render por un hechizo
                 continue
-    
+
     def render_minimap(self, player, position=(10, 10), scale=5, spells=None, particles=None):
         """
         Renderiza un minimapa en 2D con radio de colisión visible
@@ -210,28 +172,24 @@ class Renderer:
                         (col * scale, row * scale, scale, scale)
                     )
                 else:
-                    # Dibujar piso con color más oscuro
                     pygame.draw.rect(
                         minimap_surface,
                         (20, 20, 20),
                         (col * scale, row * scale, scale, scale)
                     )
         
-        # Calcular posición del jugador en el minimap
         player_map_x = int(player.x // Config.TILE_SIZE * scale)
         player_map_y = int(player.y // Config.TILE_SIZE * scale)
         
-        # Dibujar radio de colisión del jugador
         collision_radius_scaled = int(player.collision_radius / Config.TILE_SIZE * scale)
         pygame.draw.circle(
             minimap_surface,
-            (100, 100, 255, 100),  # Azul semi-transparente
+            (100, 100, 255, 100),
             (player_map_x, player_map_y),
             collision_radius_scaled,
             1
         )
         
-        # Dibujar jugador
         pygame.draw.circle(
             minimap_surface,
             Config.YELLOW,
@@ -239,7 +197,6 @@ class Renderer:
             4
         )
         
-        # Dibujar dirección del jugador
         dir_length = 15
         end_x = player_map_x + int(math.cos(player.angle) * dir_length)
         end_y = player_map_y + int(math.sin(player.angle) * dir_length)
@@ -251,7 +208,6 @@ class Renderer:
             2
         )
         
-        # Renderizar hechizos y partículas (si existen)
         try:
             if spells:
                 from src.rendering.spell_renderer import SpellRenderer
@@ -260,10 +216,8 @@ class Renderer:
                 from src.rendering.particle_renderer import ParticleRenderer
                 ParticleRenderer().render_on_minimap(minimap_surface, particles, scale)
         except Exception:
-            # Evitar que un fallo del renderizador detenga el juego
             pass
         
-        # Dibujar borde del minimap
         pygame.draw.rect(
             minimap_surface,
             Config.WHITE,
@@ -272,3 +226,4 @@ class Renderer:
         )
         
         self.screen.blit(minimap_surface, position)
+
