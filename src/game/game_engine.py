@@ -245,6 +245,10 @@ class GameEngine:
             f"Ángulo: {int(math.degrees(self.player.angle))}°",
             True, Config.WHITE,
         )
+        fps_text = self.small_font.render(
+            f"FPS: {self.clock.get_fps():.0f}",
+            True, Config.GREEN,
+        )
         controls_text = self.small_font.render(
             "WASD: Mover | Mouse: Mirar | ESC: Pausa",
             True, Config.GRAY,
@@ -254,6 +258,7 @@ class GameEngine:
         self.screen.blit(position_text, (Config.SCREEN_WIDTH - 250, 40))
         self.screen.blit(tile_text, (Config.SCREEN_WIDTH - 250, 70))
         self.screen.blit(angle_text, (Config.SCREEN_WIDTH - 250, 100))
+        self.screen.blit(fps_text, (Config.SCREEN_WIDTH - 250, 130))
         self.screen.blit(controls_text, (10, Config.SCREEN_HEIGHT - 30))
 
         # Mostrar palabras reconocidas por voz (debajo del minimapa)

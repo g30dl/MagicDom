@@ -8,7 +8,7 @@ class Config:
     # Configuración de pantalla
     SCREEN_WIDTH = 1280
     SCREEN_HEIGHT = 720
-    FPS = 60
+    FPS = 70
     
     # Configuración de raycasting
     FOV = math.pi / 3  # 60 grados
@@ -36,8 +36,8 @@ class Config:
     ORANGE = (255, 165, 0)
     
     # Jugador (AJUSTADO: velocidades más apropiadas)
-    PLAYER_SPEED = 2.0  # Velocidad de movimiento (era 2)
-    PLAYER_ROT_SPEED = 0.05  # Velocidad de rotación (era 0.05)
+    PLAYER_SPEED = 1.5  # Velocidad de movimiento (era 2)
+    PLAYER_ROT_SPEED = 0.04  # Velocidad de rotación (era 0.05)
     PLAYER_SIZE = 10
 
     # Spawn del jugador

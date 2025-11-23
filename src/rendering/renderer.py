@@ -6,6 +6,7 @@ import pygame
 import math
 from src.game.config import Config
 from src.rendering.raycaster import RayCaster, EXAMPLE_MAP
+from src.rendering.textures import load_texture
 
 class Renderer:
     def __init__(self, screen):
@@ -19,6 +20,17 @@ class Renderer:
             3: (0, 100, 150),    # Azul oscuro
             4: (180, 120, 40),   # Pared destructible
         }
+        self.wall_textures = {
+            1: load_texture("pared1.png"),
+        }
+        try:
+            tex_color = pygame.transform.average_color(self.wall_textures[1])
+            if hasattr(tex_color, "r"):
+                self.wall_colors[1] = (tex_color.r, tex_color.g, tex_color.b)
+            elif isinstance(tex_color, (tuple, list)):
+                self.wall_colors[1] = tuple(tex_color[:3])
+        except Exception:
+            pass
         
         # Calcular ancho de cada columna
         self.column_width = Config.SCREEN_WIDTH / Config.NUM_RAYS
@@ -60,11 +72,9 @@ class Renderer:
             if wall_type == 0:
                 continue
             
-            # Calcular altura de la pared basado en distancia
-            if distance == 0:
-                distance = 1
-            
-            wall_height = (Config.TILE_SIZE * Config.SCREEN_HEIGHT) / distance
+            # Calcular altura de la pared basado en distancia (clamp para evitar distorsiÛn extrema al pegarse)
+            min_dist = max(distance, Config.TILE_SIZE * 0.05)
+            wall_height = (Config.TILE_SIZE * Config.SCREEN_HEIGHT) / min_dist
             
             # Calcular posición vertical
             top = horizon - wall_height // 2
@@ -83,19 +93,38 @@ class Renderer:
             tex_factor = 0.9 + 0.1 * (((hit_x + hit_y) % Config.TILE_SIZE) / Config.TILE_SIZE)
 
             # Sombreado por distancia y lado del bloque (simula luz lateral)
-            shade_factor = max(0.2, 1 - (distance / Config.MAX_DEPTH))
+            shade_factor = max(0.2, 1 - (min_dist / Config.MAX_DEPTH))
             if side == 1:
                 shade_factor *= 0.75
             shade = shade_factor * tex_factor
-            color = tuple(int(c * shade) for c in base_color)
-            
-            # Dibujar columna
             x = i * self.column_width
-            pygame.draw.rect(
-                self.screen,
-                color,
-                (x, top, self.column_width + 1, bottom - top)
-            )
+            column_height = int(bottom - top)
+
+            texture = self.wall_textures.get(wall_type)
+            if texture:
+                tex_w, tex_h = texture.get_size()
+                # Coordenada X de la textura segun el punto de impacto
+                hit_coord = hit_y if side == 0 else hit_x
+                tex_x = int((hit_coord % Config.TILE_SIZE) / Config.TILE_SIZE * tex_w)
+                tex_x = max(0, min(tex_w - 1, tex_x))
+
+                tex_column = texture.subsurface((tex_x, 0, 1, tex_h))
+                scaled_column = pygame.transform.scale(
+                    tex_column,
+                    (int(self.column_width) + 2, max(1, column_height))
+                )
+
+                shade_value = max(0, min(255, int(255 * shade)))
+                shaded = scaled_column.copy()
+                shaded.fill((shade_value, shade_value, shade_value, 255), special_flags=pygame.BLEND_RGBA_MULT)
+                self.screen.blit(shaded, (int(x), int(top)))
+            else:
+                color = tuple(int(c * shade) for c in base_color)
+                pygame.draw.rect(
+                    self.screen,
+                    color,
+                    (x, top, self.column_width + 1, bottom - top)
+                )
 
     def render_crosshair(self, size: int = 3, color=Config.WHITE):
         """Dibuja un punto de mira simple en el centro de la pantalla."""
