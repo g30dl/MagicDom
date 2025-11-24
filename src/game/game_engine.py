@@ -27,7 +27,9 @@ class GameEngine:
 
         # Inicializar sistemas
         self.state_manager = StateManager()
-        self.renderer = Renderer(screen)
+        from src.rendering.map_manager import MapManager
+        self.map_manager = MapManager()
+        self.renderer = Renderer(screen, self.map_manager)
         self.keyboard_handler = KeyboardHandler()
         self.enemy_manager = EnemyManager()
         self.sound_manager = self._init_sound_manager()
@@ -39,19 +41,19 @@ class GameEngine:
         self._voice_error = None
 
         # Cargar mapa y generar un punto de spawn seguro (centro de un tile libre)
-        from src.rendering.raycaster import EXAMPLE_MAP
+        game_map = self.map_manager.get_map()
         tile = getattr(Config, "SPAWN_TILE", None)
         spawn_x = spawn_y = None
         if tile is not None and isinstance(tile, tuple) and len(tile) == 2:
             col, row = int(tile[0]), int(tile[1])
-            if 0 <= row < len(EXAMPLE_MAP) and 0 <= col < len(EXAMPLE_MAP[0]) and EXAMPLE_MAP[row][col] == 0:
+            if 0 <= row < len(game_map) and 0 <= col < len(game_map[0]) and game_map[row][col] == 0:
                 spawn_x = col * Config.TILE_SIZE + Config.TILE_SIZE // 2
                 spawn_y = row * Config.TILE_SIZE + Config.TILE_SIZE // 2
         if spawn_x is None:
-            spawn_x, spawn_y = self._find_spawn_center(EXAMPLE_MAP)
+            spawn_x, spawn_y = self._find_spawn_center(game_map)
         self.player = Player(x=spawn_x, y=spawn_y, angle=0)
         # Pasar el mapa al jugador para colisiones
-        self.player.set_map(EXAMPLE_MAP)
+        self.player.set_map(game_map)
 
         # Font para UI
         self.font = pygame.font.Font(None, 36)
@@ -197,12 +199,12 @@ class GameEngine:
     def render_game(self):
         """Renderiza el juego"""
         # Renderizar vista 3D
-        self.renderer.render_3d_view(self.player)
-        # Dibujar hechizos en 3D (bola de fuego visible hasta colisión)
+        active_spells = None
         try:
-            self.renderer.render_spells_3d(self.player, self.spells.get_active_spells())
+            active_spells = self.spells.get_active_spells()
         except Exception:
-            pass
+            active_spells = None
+        self.renderer.render_3d_view(self.player, spells=active_spells)
 
         # HUD de manos
         try:

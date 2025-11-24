@@ -8,28 +8,25 @@ class Config:
     # Configuración de pantalla
     SCREEN_WIDTH = 1280
     SCREEN_HEIGHT = 720
-    FPS = 70
+    FPS = 60
     
     # Configuración de raycasting
     FOV = math.pi / 3  # 60 grados
     HALF_FOV = FOV / 2
     # Resolución adaptativa: más ancho => más rayos, limitado por BASE_NUM_RAYS
-    BASE_NUM_RAYS = 160
+    BASE_NUM_RAYS = 160  # 20% más detalle sobre 160
     NUM_RAYS = max(BASE_NUM_RAYS, int(SCREEN_WIDTH / 4))
-    MAX_DEPTH = 800  # Distancia máxima de visión
+    MAX_DEPTH = 1200  # Distancia máxima de visión (mayor alcance)
     DELTA_ANGLE = FOV / NUM_RAYS
-    # Factor de shearing vertical para mirar arriba/abajo (pitch)
-    PITCH_SHEAR_FACTOR = 0.15
 
     # Texturas de paredes
     TEXTURE_SIZE = 256
-    WALL_TEXTURES_PATH = "assets/textures"  # pared1.png vive aqui actualmente
+    WALL_TEXTURES_PATH = "assets/textures"
     WALL_TEXTURE_MAP = {
         1: "pared1.png",
-        # Otros tipos pueden agregarse luego; caeran en placeholder si falta archivo
-        2: "madera_oscura.png",
-        3: "magica_azul.png",
-        4: "destructible_oro.png",
+        2: "pared2.png",
+        3: "pared3.png",
+        4: "pared4-destructible.png",
     }
     
     # Tamaño del mapa

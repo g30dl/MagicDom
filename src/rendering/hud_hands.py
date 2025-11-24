@@ -6,6 +6,7 @@ Busca archivos en assets/sprites:
 Si no existen, usa placeholders.
 """
 import os
+import math
 import pygame
 from src.game.config import Config
 
@@ -63,19 +64,18 @@ class HUDHands:
         sprite = pygame.transform.smoothscale(self.current, (target_w, target_h))
 
         # Bobbing
-        import math
         bob_y = int(math.sin(self.time * 4.0) * max(1, target_h * 0.01))
 
-        # Posición: centro inferior con leve offset
+        # Posición: anclaje configurable (permite overflow a la derecha)
         anchor = getattr(Config, 'HUD_HANDS_ANCHOR', 'center')
         if anchor == 'right':
             overflow = int(getattr(Config, 'HUD_HANDS_RIGHT_OVERFLOW', 0))
             x = sw - target_w + overflow
         elif anchor == 'left':
-            left_off = int(getattr(Config, 'HUD_HANDS_LEFT_OFFSET', 0))
-            x = 0 + left_off
+            x = int(getattr(Config, 'HUD_HANDS_LEFT_OFFSET', 0))
         else:
             x = (sw - target_w) // 2 + int(getattr(Config, 'HUD_HANDS_CENTER_OFFSET_X', 0))
-        y = sh - target_h - int(getattr(Config, 'HUD_HANDS_BOTTOM_OFFSET', 10)) + bob_y
+
+        y = sh - target_h - int(getattr(Config, 'HUD_HANDS_BOTTOM_OFFSET', 0)) + bob_y
 
         screen.blit(sprite, (x, y))

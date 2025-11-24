@@ -1,8 +1,9 @@
 """
-Gestor de hechizos activos. Permite castear por nombre y actualiza sus efectos.
+Gestor de hechizos activos. Auto-aim opcional hacia enemigos cercanos.
 """
 import math
 from typing import List
+from src.game.config import Config
 from .fireball import Fireball
 from .lightning import Lightning
 from .frost import Frost
@@ -16,6 +17,32 @@ class SpellManager:
         self.player = player
         self.particles = particle_manager
         self.sound = sound_manager
+        self._last_enemies: List = []
+
+    def _pick_auto_aim_angle(self):
+        """
+        Devuelve el ángulo hacia el enemigo más cercano dentro del FOV.
+        Retorna None si no hay objetivo válido.
+        """
+        if not self._last_enemies:
+            return None
+        best_angle = None
+        best_dist_sq = None
+        px, py = self.player.x, self.player.y
+        for enemy in self._last_enemies:
+            if not getattr(enemy, "alive", True):
+                continue
+            dx = enemy.x - px
+            dy = enemy.y - py
+            dist_sq = dx * dx + dy * dy
+            angle_to = math.atan2(dy, dx)
+            angle_diff = (angle_to - self.player.angle + math.pi) % (2 * math.pi) - math.pi
+            if abs(angle_diff) > getattr(Config, "HALF_FOV", math.pi / 6):
+                continue
+            if best_angle is None or dist_sq < best_dist_sq:
+                best_angle = angle_to
+                best_dist_sq = dist_sq
+        return best_angle
 
     def cast_spell(self, spell_name: str):
         if not spell_name:
@@ -25,8 +52,7 @@ class SpellManager:
         if self.active_spells:
             return None
 
-        angle = self.player.angle
-        # Spawn ligeramente delante del jugador para evitar autocolisión
+        angle = self._pick_auto_aim_angle() or self.player.angle
         spawn_offset = getattr(self.player, "collision_radius", 20) * 1.5
         x = self.player.x + math.cos(angle) * spawn_offset
         y = self.player.y + math.sin(angle) * spawn_offset
@@ -55,9 +81,9 @@ class SpellManager:
             'enemies': enemies or [],
             'sound': self.sound,
         }
+        self._last_enemies = context['enemies']
         for s in list(self.active_spells):
             s.update(dt, context)
-        # Limpiar muertos
         self.active_spells = [s for s in self.active_spells if getattr(s, 'alive', False)]
 
     def get_active_spells(self):

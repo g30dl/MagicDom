@@ -1,16 +1,8 @@
 """
-Paquete de entidades del juego.
+Game entities package.
 
-Evitar importaciones ansiosas para no provocar ciclos durante la carga.
-Importa submódulos directamente donde se necesiten:
-  from src.entities.player import Player
-  from src.entities.enemy import Enemy
-  from src.entities.spell import Spell
+Exports the main subpackages (player, enemies, spells, particles) without
+forcing eager imports that might create circular dependencies.
 """
 
-__all__ = [
-    'player',
-    'enemy',
-    'spell',
-]
-
+__all__ = ["player", "enemies", "spells", "particles"]

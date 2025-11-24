@@ -7,7 +7,7 @@ from src.game.config import Config
 
 class KeyboardHandler:
     def __init__(self):
-        self.mouse_sensitivity = 0.001  # Sensibilidad reducida (X e Y)
+        self.mouse_sensitivity = 0.001  # Sensibilidad reducida (solo X)
         pygame.mouse.set_visible(True)
         pygame.event.set_grab(False)
         
@@ -47,8 +47,6 @@ class KeyboardHandler:
             mouse_dx, mouse_dy = pygame.mouse.get_rel()
             if mouse_dx != 0:
                 player.rotate(mouse_dx * self.mouse_sensitivity, dt)
-            if mouse_dy != 0:
-                player.look_up_down(-mouse_dy * self.mouse_sensitivity, dt)
     
     def release_mouse(self):
         """Libera el mouse (para menús)"""
