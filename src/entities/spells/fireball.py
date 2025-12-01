@@ -14,7 +14,7 @@ class Fireball(SpellBase):
             y=y,
             angle=angle,
             speed=5.0,
-            damage=25,
+            damage=40,
             lifetime=3.0,
             color=(255, 120, 40),
         )

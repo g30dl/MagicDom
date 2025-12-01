@@ -31,10 +31,15 @@ class KeyboardHandler:
             strafe = -1
         if keys[pygame.K_d]:
             strafe = 1
+
+        # Sprint con Shift
+        speed = player.move_speed
+        if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+            speed *= getattr(Config, "PLAYER_SPRINT_MULT", 1.5)
         
         # Aplicar movimiento (CORREGIDO: ahora pasa dt correctamente)
         if forward != 0 or strafe != 0:
-            player.move(forward, strafe, dt)
+            player.move(forward, strafe, dt, speed=speed)
         
         # Rotación con flechas (alternativa al mouse)
         if keys[pygame.K_LEFT]:

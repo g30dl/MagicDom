@@ -4,7 +4,9 @@ Maneja el loop principal y coordina todos los sistemas
 """
 import pygame
 import math
+import random
 import threading
+import os
 from collections import deque
 from .state_manager import StateManager, GameState
 from .config import Config
@@ -24,15 +26,20 @@ class GameEngine:
         self.screen = screen
         self.clock = pygame.time.Clock()
         self.running = True
+        self.restart_requested = False
 
         # Inicializar sistemas
         self.state_manager = StateManager()
         from src.rendering.map_manager import MapManager
         self.map_manager = MapManager()
+        game_map = self.map_manager.get_map()
+        self.enemy_spawns = getattr(self.map_manager, "enemy_spawns", [])
         self.renderer = Renderer(screen, self.map_manager)
         self.keyboard_handler = KeyboardHandler()
-        self.enemy_manager = EnemyManager()
         self.sound_manager = self._init_sound_manager()
+        self.blood_surface = self._load_blood_overlay()
+        self.blood_timer = 0.0
+        self.blood_duration = 0.7
 
         # Reconocimiento de voz (estado y buffer)
         self.voice_handler = None
@@ -41,7 +48,6 @@ class GameEngine:
         self._voice_error = None
 
         # Cargar mapa y generar un punto de spawn seguro (centro de un tile libre)
-        game_map = self.map_manager.get_map()
         tile = getattr(Config, "SPAWN_TILE", None)
         spawn_x = spawn_y = None
         if tile is not None and isinstance(tile, tuple) and len(tile) == 2:
@@ -54,6 +60,10 @@ class GameEngine:
         self.player = Player(x=spawn_x, y=spawn_y, angle=0)
         # Pasar el mapa al jugador para colisiones
         self.player.set_map(game_map)
+        self.player.on_hit_callback = self._on_player_hit
+
+        # Enemigos y mapa para IA
+        self.enemy_manager = EnemyManager(game_map)
 
         # Font para UI
         self.font = pygame.font.Font(None, 36)
@@ -77,6 +87,9 @@ class GameEngine:
             sound_manager=self.sound_manager,
         )
 
+        # Spawns iniciales
+        self._spawn_initial_enemies()
+
     def run(self):
         """Loop principal del juego"""
         while self.running:
@@ -94,6 +107,8 @@ class GameEngine:
                 self.update_game(dt)
             elif current_state == GameState.PAUSED:
                 self.update_pause()
+            elif current_state == GameState.GAME_OVER:
+                self.update_game_over()
 
             # Renderizar
             self.render(current_state)
@@ -140,6 +155,8 @@ class GameEngine:
 
         # Actualizar jugador
         self.player.update(dt)
+        if self.blood_timer > 0:
+            self.blood_timer -= dt
 
         # Actualizar enemigos (si hay)
         try:
@@ -165,6 +182,11 @@ class GameEngine:
         except Exception:
             pass
 
+        # Check muerte del jugador
+        if not self.player.is_alive():
+            self.state_manager.change_state(GameState.GAME_OVER)
+            self.keyboard_handler.release_mouse()
+
     def update_pause(self):
         """Actualiza lógica de pausa"""
         keys = pygame.key.get_pressed()
@@ -174,6 +196,14 @@ class GameEngine:
         if keys[pygame.K_m]:
             self.state_manager.change_state(GameState.MENU)
             self.keyboard_handler.release_mouse()
+
+    def update_game_over(self):
+        """Espera input en Game Over."""
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_r]:
+            self._restart_game()
+        if keys[pygame.K_ESCAPE]:
+            self.running = False
 
     def render(self, state):
         """Renderiza el frame actual"""
@@ -185,6 +215,8 @@ class GameEngine:
             self.render_game()
         elif state == GameState.PAUSED:
             self.render_pause()
+        elif state == GameState.GAME_OVER:
+            self.render_game_over()
 
     def render_menu(self):
         """Renderiza el menú principal"""
@@ -200,11 +232,16 @@ class GameEngine:
         """Renderiza el juego"""
         # Renderizar vista 3D
         active_spells = None
+        enemies_to_draw = None
         try:
             active_spells = self.spells.get_active_spells()
         except Exception:
             active_spells = None
-        self.renderer.render_3d_view(self.player, spells=active_spells)
+        try:
+            enemies_to_draw = self.enemy_manager.get_renderable_enemies()
+        except Exception:
+            enemies_to_draw = None
+        self.renderer.render_3d_view(self.player, spells=active_spells, enemies=enemies_to_draw)
 
         # HUD de manos
         try:
@@ -263,6 +300,9 @@ class GameEngine:
         self.screen.blit(fps_text, (Config.SCREEN_WIDTH - 250, 130))
         self.screen.blit(controls_text, (10, Config.SCREEN_HEIGHT - 30))
 
+        # Overlay de sangre cuando recibe daño
+        self._draw_blood_overlay()
+
         # Mostrar palabras reconocidas por voz (debajo del minimapa)
         if self.voice_handler is None and self._voice_error:
             voice_text = self.small_font.render(
@@ -294,6 +334,105 @@ class GameEngine:
         self.screen.blit(pause_text, (Config.SCREEN_WIDTH // 2 - pause_text.get_width() // 2, 250))
         self.screen.blit(resume, (Config.SCREEN_WIDTH // 2 - resume.get_width() // 2, 350))
         self.screen.blit(menu, (Config.SCREEN_WIDTH // 2 - menu.get_width() // 2, 400))
+
+    def render_game_over(self):
+        """Pantalla de Game Over con opciones."""
+        # Mostrar última vista congelada
+        self.renderer.render_3d_view(self.player)
+
+        overlay = pygame.Surface((Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT))
+        overlay.set_alpha(180)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+
+        title = self.font.render("GAME OVER", True, Config.RED)
+        retry = self.small_font.render("R - Reiniciar", True, Config.WHITE)
+        quit_text = self.small_font.render("ESC - Salir", True, Config.WHITE)
+
+        self.screen.blit(title, (Config.SCREEN_WIDTH // 2 - title.get_width() // 2, 240))
+        self.screen.blit(retry, (Config.SCREEN_WIDTH // 2 - retry.get_width() // 2, 340))
+        self.screen.blit(quit_text, (Config.SCREEN_WIDTH // 2 - quit_text.get_width() // 2, 380))
+
+    def _spawn_initial_enemies(self):
+        """Spawnea enemigos marcados en el mapa (celda 9). Si no hay, usa fallback alejado."""
+        if not self.enemy_manager:
+            return
+
+        spawn_tiles = list(self.enemy_spawns or [])
+        if not spawn_tiles:
+            spawn_tiles = self._pick_enemy_spawn_tiles(count=3, min_distance=Config.TILE_SIZE * 4)
+
+        for col, row in spawn_tiles:
+            x = col * Config.TILE_SIZE + Config.TILE_SIZE // 2
+            y = row * Config.TILE_SIZE + Config.TILE_SIZE // 2
+            try:
+                self.enemy_manager.add_enemy(x, y, enemy_type="rockbad")
+            except Exception:
+                continue
+
+    def _pick_enemy_spawn_tiles(self, count=3, min_distance=Config.TILE_SIZE * 3):
+        """Devuelve hasta `count` tiles libres lejos del jugador."""
+        game_map = self.player.game_map if hasattr(self.player, "game_map") else None
+        if not game_map:
+            return []
+        rows = len(game_map)
+        cols = len(game_map[0]) if rows else 0
+        player_tile = self.player.get_map_position()
+        min_tiles = max(2, int(min_distance // Config.TILE_SIZE))
+
+        candidates = []
+        for row in range(1, max(0, rows - 1)):
+            for col in range(1, max(0, cols - 1)):
+                if game_map[row][col] != 0:
+                    continue
+                if abs(col - player_tile[0]) + abs(row - player_tile[1]) < min_tiles:
+                    continue
+                candidates.append((col, row))
+
+        random.shuffle(candidates)
+        return candidates[:count]
+
+    def _load_blood_overlay(self):
+        """Carga la textura de sangre en pantalla o un fallback rojo."""
+        path = "assets/textures/blood_screen.png"
+        try:
+            if os.path.exists(path):
+                surf = pygame.image.load(path).convert_alpha()
+                return pygame.transform.scale(surf, (Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT))
+        except Exception:
+            pass
+        fallback = pygame.Surface((Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT), pygame.SRCALPHA)
+        fallback.fill((150, 0, 0, 160))
+        return fallback
+
+    def _draw_blood_overlay(self):
+        """Dibuja overlay de sangre con fade según el tiempo restante."""
+        if self.blood_timer <= 0 or self.blood_surface is None:
+            return
+        alpha = int(255 * max(0.0, min(1.0, self.blood_timer / self.blood_duration)))
+        try:
+            overlay = self.blood_surface.copy()
+            overlay.set_alpha(alpha)
+            self.screen.blit(overlay, (0, 0))
+        except Exception:
+            pass
+
+    def _on_player_hit(self, damage):
+        """Se dispara cuando el jugador recibe daño; activa overlay de sangre."""
+        self.blood_timer = self.blood_duration
+
+    def _restart_game(self):
+        """Reinicia el juego rápidamente re-creando el estado principal."""
+        try:
+            if self.voice_handler:
+                self.voice_handler.stop()
+        except Exception:
+            pass
+        screen = self.screen
+        # Re-inicializar todo
+        self.__init__(screen)
+        self.state_manager.change_state(GameState.PLAYING)
+        self.keyboard_handler.capture_mouse()
 
     def _find_spawn_center(self, game_map):
         """Busca el primer tile libre (valor 0) y retorna su centro en pixeles.

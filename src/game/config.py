@@ -47,6 +47,7 @@ class Config:
     PLAYER_SPEED = 1.5  # Velocidad de movimiento (era 2)
     PLAYER_ROT_SPEED = 0.04  # Velocidad de rotación (era 0.05)
     PLAYER_SIZE = 10
+    PLAYER_SPRINT_MULT = 1.6  # Multiplicador de velocidad al mantener Shift
 
     # Spawn del jugador
     # Usar un tile específico (col, row). Si es None, se elegirá automáticamente

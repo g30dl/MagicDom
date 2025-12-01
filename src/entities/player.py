@@ -102,10 +102,17 @@ class Player:
 
     def take_damage(self, damage: int):
         """Recibe daño."""
-        self.health -= int(damage)
+        dmg = int(damage)
+        self.health -= dmg
         if self.health < 0:
             self.health = 0
-        print(f"Jugador recibe {damage} de daño. Salud: {self.health}/{self.max_health}")
+        try:
+            callback = getattr(self, "on_hit_callback", None)
+            if callback:
+                callback(dmg)
+        except Exception:
+            pass
+        print(f"Jugador recibe {dmg} de daño. Salud: {self.health}/{self.max_health}")
 
     def heal(self, amount: int):
         """Recupera salud."""

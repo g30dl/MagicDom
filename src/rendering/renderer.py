@@ -57,7 +57,7 @@ class Renderer:
         # Temporal: desactivar gradiente vertical para probar FPS
         return surface
 
-    def render_3d_view(self, player, spells=None):
+    def render_3d_view(self, player, spells=None, enemies=None):
         """Renderiza la vista 3D desde la perspectiva del jugador."""
         horizon = self._compute_horizon(player)
         self._draw_background(horizon, player)
@@ -70,6 +70,9 @@ class Renderer:
             item = self._render_wall_column(ray, i, horizon)
             if item:
                 render_queue.append(item)
+
+        if enemies:
+            render_queue.extend(self._gather_enemy_commands(player, enemies, horizon, rays))
 
         if spells:
             render_queue.extend(self._gather_spell_commands(player, spells, horizon, rays))
@@ -275,6 +278,25 @@ class Renderer:
                 )
             except Exception:
                 pass
+        elif item_type == "sprite":
+            surface = item.get("surface")
+            if surface is not None:
+                try:
+                    self.screen.blit(surface, (int(item.get("x", 0)), int(item.get("y", 0))))
+                    return
+                except Exception:
+                    pass
+            color = item.get("fallback_color", Config.MAGENTA if hasattr(Config, "MAGENTA") else (255, 0, 255))
+            w = max(1, int(item.get("width", 1)))
+            h = max(1, int(item.get("height", 1)))
+            try:
+                pygame.draw.rect(
+                    self.screen,
+                    color,
+                    (int(item.get("x", 0)), int(item.get("y", 0)), w, h),
+                )
+            except Exception:
+                pass
 
     def _gather_spell_commands(self, player, spells, horizon, rays):
         commands = []
@@ -312,6 +334,62 @@ class Renderer:
                     "y": screen_y,
                     "radius": radius,
                     "color": getattr(s, 'color', (255, 200, 50)),
+                })
+            except Exception:
+                continue
+        return commands
+
+    def _gather_enemy_commands(self, player, enemies, horizon, rays):
+        commands = []
+        if not enemies or not rays:
+            return commands
+
+        for enemy in enemies:
+            try:
+                dx = enemy.x - player.x
+                dy = enemy.y - player.y
+                distance = max(1.0, math.hypot(dx, dy))
+
+                angle_to = math.atan2(dy, dx)
+                angle_diff = (angle_to - player.angle + math.pi) % (2 * math.pi) - math.pi
+                if abs(angle_diff) > Config.HALF_FOV + 0.2:
+                    continue
+
+                ray_index_f = (angle_diff + Config.HALF_FOV) / Config.DELTA_ANGLE
+                ray_index = int(max(0, min(Config.NUM_RAYS - 1, ray_index_f)))
+
+                wall_dist = rays[ray_index].get("distance", 0)
+                if distance > wall_dist + Config.TILE_SIZE * 0.2:
+                    continue
+
+                cam_angle = angle_to + math.pi  # ángulo desde el enemigo hacia la cámara
+                frame = enemy.get_frame_for_view(cam_angle) if hasattr(enemy, "get_frame_for_view") else enemy.get_current_frame()
+                if frame is None:
+                    frame = getattr(enemy, "placeholder_frame", None)
+                if frame is None:
+                    continue
+
+                sprite_h = (Config.TILE_SIZE * Config.SCREEN_HEIGHT) / distance
+                sprite_h *= getattr(enemy, "sprite_scale", 1.0)
+                sprite_w = sprite_h * (frame.get_width() / max(1, frame.get_height()))
+
+                if sprite_h <= 2 or sprite_w <= 2:
+                    continue
+
+                scaled = pygame.transform.smoothscale(frame, (int(sprite_w), int(sprite_h)))
+
+                screen_x = int((ray_index_f / Config.NUM_RAYS) * Config.SCREEN_WIDTH)
+                draw_x = screen_x - scaled.get_width() // 2
+                draw_y = horizon - scaled.get_height() // 2
+
+                commands.append({
+                    "type": "sprite",
+                    "distance": distance,
+                    "surface": scaled,
+                    "x": draw_x,
+                    "y": draw_y,
+                    "width": scaled.get_width(),
+                    "height": scaled.get_height(),
                 })
             except Exception:
                 continue
