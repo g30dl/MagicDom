@@ -27,6 +27,7 @@ class Config:
         2: "pared2.png",
         3: "pared3.png",
         4: "pared4-destructible.png",
+        5: "cartel.png",  # Cartel/placa decorativa
     }
     
     # Tamaño del mapa
@@ -51,7 +52,7 @@ class Config:
 
     # Spawn del jugador
     # Usar un tile específico (col, row). Si es None, se elegirá automáticamente
-    SPAWN_TILE = None  # ejemplo: (1, 1)
+    SPAWN_TILE = (1,5)  # ejemplo: (1, 1)
     
     # Configuración de voz
     VOICE_LANGUAGE = "es-ES"  # Español
@@ -61,8 +62,18 @@ class Config:
     SPELLS = {
         "bola de fuego": "fireball",
         "fuego": "fireball",
+        "fireball": "fireball",
+        "curar": "healing",
+        "heal": "healing",
+        "velocidad": "speed",
+        "rapidez": "speed",
+        "speed": "speed",
+        "hielo": "frost",
+        "congelar": "frost",
+        "freeze": "frost",
         "rayo": "lightning",
         "trueno": "lightning",
+        "lightning": "lightning",
         "relámpago": "lightning"
     }
     

@@ -16,6 +16,9 @@ class Player:
         # Velocidad de movimiento y rotación
         self.move_speed = Config.PLAYER_SPEED
         self.rot_speed = Config.PLAYER_ROT_SPEED
+        # Bosteos temporales
+        self.speed_boost_multiplier = 1.0
+        self.speed_boost_timer = 0.0
 
         # Radio de colisión del jugador
         self.collision_radius = 20
@@ -75,6 +78,7 @@ class Player:
         """
         if speed is None:
             speed = self.move_speed
+        speed *= getattr(self, "speed_boost_multiplier", 1.0)
 
         move_x = (math.cos(self.angle) * forward - math.sin(self.angle) * strafe) * speed * dt * 100
         move_y = (math.sin(self.angle) * forward + math.cos(self.angle) * strafe) * speed * dt * 100
@@ -123,8 +127,17 @@ class Player:
         return self.health > 0
 
     def update(self, dt: float):
-        """Actualiza el estado del jugador cada frame (placeholder)."""
-        pass
+        """Actualiza el estado del jugador cada frame (timers)."""
+        if self.speed_boost_timer > 0:
+            self.speed_boost_timer -= dt
+            if self.speed_boost_timer <= 0:
+                self.speed_boost_timer = 0
+                self.speed_boost_multiplier = 1.0
+
+    def apply_speed_boost(self, multiplier: float, duration: float):
+        """Aplica un boost de velocidad temporal."""
+        self.speed_boost_multiplier = max(1.0, float(multiplier))
+        self.speed_boost_timer = max(0.0, float(duration))
 
     def get_position(self):
         """Retorna la posición actual."""

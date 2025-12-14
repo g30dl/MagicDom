@@ -297,6 +297,16 @@ class Renderer:
                 )
             except Exception:
                 pass
+        elif item_type == "lightning":
+            x = int(item.get("x", 0))
+            y_top = int(item.get("y_top", 0))
+            y_bottom = int(item.get("y_bottom", Config.SCREEN_HEIGHT // 2))
+            w = max(2, int(item.get("width", 4)))
+            color = item.get("color", (180, 220, 255))
+            try:
+                pygame.draw.rect(self.screen, color, (x - w // 2, y_top, w, max(1, y_bottom - y_top)))
+            except Exception:
+                pass
 
     def _gather_spell_commands(self, player, spells, horizon, rays):
         commands = []
@@ -305,36 +315,54 @@ class Renderer:
 
         for s in spells:
             try:
-                dx = s.x - player.x
-                dy = s.y - player.y
-                distance = max(1.0, (dx * dx + dy * dy) ** 0.5)
-
-                angle_to = math.atan2(dy, dx)
-                angle_diff = (angle_to - player.angle + math.pi) % (2 * math.pi) - math.pi
-                if abs(angle_diff) > Config.HALF_FOV:
+                # No dibujar hechizos de curación (se muestran como overlay en HUD)
+                if getattr(s, "name", "") == "healing":
                     continue
+                strike_points = getattr(s, "active_strikes", None) or getattr(s, "strike_points", None)
+                points = strike_points if strike_points else [(s.x, s.y)]
+                for px, py in points:
+                    dx = px - player.x
+                    dy = py - player.y
+                    distance = max(1.0, (dx * dx + dy * dy) ** 0.5)
 
-                ray_index_f = (angle_diff + Config.HALF_FOV) / Config.DELTA_ANGLE
-                ray_index = int(max(0, min(Config.NUM_RAYS - 1, ray_index_f)))
+                    angle_to = math.atan2(dy, dx)
+                    angle_diff = (angle_to - player.angle + math.pi) % (2 * math.pi) - math.pi
+                    if abs(angle_diff) > Config.HALF_FOV:
+                        continue
 
-                wall_dist = rays[ray_index].get("distance", 0)
-                if distance > wall_dist:
-                    continue
+                    ray_index_f = (angle_diff + Config.HALF_FOV) / Config.DELTA_ANGLE
+                    ray_index = int(max(0, min(Config.NUM_RAYS - 1, ray_index_f)))
 
-                sprite_h = (Config.TILE_SIZE * Config.SCREEN_HEIGHT) / distance
-                radius = int(max(3, sprite_h * 0.15))
+                    wall_dist = rays[ray_index].get("distance", 0)
+                    if distance > wall_dist:
+                        continue
 
-                screen_x = int((ray_index_f / Config.NUM_RAYS) * Config.SCREEN_WIDTH)
-                screen_y = horizon
+                    sprite_h = (Config.TILE_SIZE * Config.SCREEN_HEIGHT) / distance
+                    base_radius = 0.25 if strike_points else 0.15
+                    radius = int(max(6 if strike_points else 3, sprite_h * base_radius))
 
-                commands.append({
-                    "type": "spell",
-                    "distance": distance,
-                    "x": screen_x,
-                    "y": screen_y,
-                    "radius": radius,
-                    "color": getattr(s, 'color', (255, 200, 50)),
-                })
+                    screen_x = int((ray_index_f / Config.NUM_RAYS) * Config.SCREEN_WIDTH)
+                    screen_y = horizon
+
+                    if strike_points:
+                        commands.append({
+                            "type": "lightning",
+                            "distance": distance,
+                            "x": screen_x,
+                            "y_top": 0,
+                            "y_bottom": Config.SCREEN_HEIGHT,
+                            "width": max(3, int(radius * 0.6)),
+                            "color": getattr(s, 'color', (180, 220, 255)),
+                        })
+                    else:
+                        commands.append({
+                            "type": "spell",
+                            "distance": distance,
+                            "x": screen_x,
+                            "y": screen_y,
+                            "radius": radius,
+                            "color": getattr(s, 'color', (255, 200, 50)),
+                        })
             except Exception:
                 continue
         return commands

@@ -93,7 +93,7 @@ ENEMY_PRESETS = {
         "speed": 1.6,
         "attack_cooldown": 1.3,
         "attack_range": Config.TILE_SIZE * 0.9,
-        "detection_range": Config.TILE_SIZE * 4.5,
+        "detection_range": Config.TILE_SIZE * 9,
         "radius": Config.TILE_SIZE * 0.2,
         "sprite_scale": 1.1,
     },
@@ -104,7 +104,7 @@ ENEMY_PRESETS = {
         "speed": 1.5,
         "attack_cooldown": 1.5,
         "attack_range": Config.TILE_SIZE * 0.8,
-        "detection_range": Config.TILE_SIZE * 4,
+        "detection_range": Config.TILE_SIZE * 7,
         "radius": Config.TILE_SIZE * 0.18,
         "sprite_scale": 1.0,
     },
@@ -130,11 +130,10 @@ class Enemy:
         self.attack_cooldown = 0.0
         self.attack_range = preset.get("attack_range", 100)
         self.detection_range = preset.get("detection_range", 500)
-        self.lose_sight_range = self.detection_range * 1.2
-        self._chase_memory = 1.2  # segundos de memoria tras perder visión antes de soltar
         self.collision_radius = preset.get("radius", 18)
         self.sprite_scale = preset.get("sprite_scale", 1.0)
         self.angle = 0.0
+        self.frozen_timer = 0.0
 
         # IA y pathfinding
         self.state = "idle"  # idle, walk, attack, pain, death
@@ -143,7 +142,6 @@ class Enemy:
         self.path_recalc_interval = 0.35
         self._pain_timer = 0.0
         self.has_line_of_sight = False
-        self._chase_timer = 0.0
 
         # Animaciones
         asset_path = preset.get("asset_path")
@@ -164,10 +162,11 @@ class Enemy:
             idle_frame = self.directional_idle.get("front")
         if idle_frame is None:
             idle_frame = base_frame
+        self.frozen_frame = _load_frame(os.path.join(asset_path or "", "frost.png"), base_frame)
 
         walk_frames = _load_frames_from_dir(os.path.join(asset_path or "", "walk"), base_frame) or [base_frame]
         walk_frames = self._stretch_walk_frames(walk_frames)
-        walk_frame_time = 0.12  # ajusta duración total combinada con hold
+        walk_frame_time = 0.1  # pasos rápidos entre frames, ciclo total lento por repetición
 
         anims = {}
         anims["idle"] = SpriteAnimation([idle_frame], frame_time=0.25, loop=True)
@@ -227,7 +226,7 @@ class Enemy:
             return frames
         if len(frames) < 3:
             return frames
-        hold = 20  # cuántas veces repetir el primer frame (ciclo ~3s con frame_time ~0.12)
+        hold = 35  # cuántas veces repetir el primer frame (ciclo más corto)
         stretched = [frames[0]] * hold + [frames[1]] * 2 + [frames[2]] * 2
         return stretched
 
@@ -260,7 +259,7 @@ class Enemy:
         Devuelve el frame actual considerando el ángulo de cámara alrededor del enemigo.
         camera_angle: ángulo (rad) desde el enemigo hacia la cámara (player).
         """
-        if self.directional_idle and self._current_anim_name == "idle":
+        if self._current_anim_name == "idle" and self.directional_idle:
             delta = (camera_angle - self.angle + math.pi) % (2 * math.pi) - math.pi
             key = self._direction_key(delta)
             frame = self.directional_idle.get(key)
@@ -420,7 +419,7 @@ class Enemy:
         dx = player.x - self.x
         dy = player.y - self.y
         distance = math.hypot(dx, dy)
-        if distance <= 0.001 or distance > self.lose_sight_range:
+        if distance <= 0.001 or distance > self.detection_range * 1.2:
             return False
 
         steps = max(1, int(distance / (Config.TILE_SIZE * 0.6)))
@@ -442,8 +441,13 @@ class Enemy:
 
         if self.attack_cooldown > 0:
             self.attack_cooldown -= dt
-        if self._chase_timer > 0:
-            self._chase_timer -= dt
+
+        if self.frozen_timer > 0:
+            self.frozen_timer -= dt
+            self.state = "idle"
+            self._switch_animation("idle")
+            self._update_animation(dt)
+            return
 
         if self.state == "death":
             self._update_animation(dt)
@@ -458,9 +462,6 @@ class Enemy:
             return
 
         self.has_line_of_sight = self._has_line_of_sight(player)
-        if self.has_line_of_sight:
-            self._chase_timer = self._chase_memory
-
         dist_to_player = math.hypot(player.x - self.x, player.y - self.y)
 
         if self._pain_timer > 0:
@@ -480,17 +481,7 @@ class Enemy:
             self._update_animation(dt)
             return
 
-        can_chase = (
-            dist_to_player <= self.detection_range
-            or (self._chase_timer > 0 and dist_to_player <= self.lose_sight_range)
-        )
-
-        if self.has_line_of_sight and can_chase:
-            self.state = "walk"
-            self._switch_animation("walk")
-            self._move_towards_player(dt, player)
-        elif can_chase and self._chase_timer > 0:
-            # Aún en memoria de persecución aunque no haya LOS
+        if self.has_line_of_sight and dist_to_player <= self.detection_range:
             self.state = "walk"
             self._switch_animation("walk")
             self._move_towards_player(dt, player)
@@ -524,6 +515,12 @@ class Enemy:
             multiplier = 1.5
         elif damage_type == "lightning" and self.type == "fast":
             multiplier = 1.5
+        elif damage_type == "frost":
+            # Congelar por 3.5 segundos al recibir frost
+            self.frozen_timer = max(self.frozen_timer, 3.5)
+            if hasattr(self, "frozen_frame") and self.frozen_frame:
+                self._current_anim = SpriteAnimation([self.frozen_frame], frame_time=0.5, loop=True)
+                self._current_anim_name = "frozen"
 
         actual_damage = int(damage * multiplier)
         self.health -= actual_damage

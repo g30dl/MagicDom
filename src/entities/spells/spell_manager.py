@@ -8,6 +8,7 @@ from .fireball import Fireball
 from .lightning import Lightning
 from .frost import Frost
 from .healing import Healing
+from .speed_boost import SpeedBoost
 
 
 class SpellManager:
@@ -52,7 +53,8 @@ class SpellManager:
         if self.active_spells:
             return None
 
-        angle = self._pick_auto_aim_angle() or self.player.angle
+        # Auto-aim desactivado: usa siempre el ángulo actual del jugador
+        angle = self.player.angle
         spawn_offset = getattr(self.player, "collision_radius", 20) * 1.5
         x = self.player.x + math.cos(angle) * spawn_offset
         y = self.player.y + math.sin(angle) * spawn_offset
@@ -66,6 +68,8 @@ class SpellManager:
             spell = Frost(x, y, angle)
         elif spell_name == "healing":
             spell = Healing(x, y, angle)
+        elif spell_name == "speed":
+            spell = SpeedBoost(x, y, angle)
 
         if spell is not None:
             self.active_spells.append(spell)

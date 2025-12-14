@@ -40,6 +40,15 @@ class GameEngine:
         self.blood_surface = self._load_blood_overlay()
         self.blood_timer = 0.0
         self.blood_duration = 0.7
+        # Overlay de curación y carteles
+        self.heal_flash_timer = 0.0
+        self.heal_flash_duration = 0.5
+        self.sign_message = None
+        self.sign_alpha = 0.0
+        self.sign_target_alpha = 0.0
+        # Overlay de curación (flash verde al sanar)
+        self.heal_flash_timer = 0.0
+        self.heal_flash_duration = 0.5
 
         # Reconocimiento de voz (estado y buffer)
         self.voice_handler = None
@@ -68,6 +77,7 @@ class GameEngine:
         # Font para UI
         self.font = pygame.font.Font(None, 36)
         self.small_font = pygame.font.Font(None, 24)
+        self.health_font = pygame.font.Font(None, 54)
 
         # Iniciar escucha continua de voz (si es posible)
         try:
@@ -182,6 +192,9 @@ class GameEngine:
         except Exception:
             pass
 
+        # Overlay de carteles (detección de cercanía)
+        self._update_sign_overlay(dt)
+
         # Check muerte del jugador
         if not self.player.is_alive():
             self.state_manager.change_state(GameState.GAME_OVER)
@@ -267,54 +280,26 @@ class GameEngine:
             self.renderer.render_minimap(self.player, position=(10, 10), scale=5)
 
         # Renderizar HUD simple
-        health_text = self.small_font.render(
+        health_text = self.health_font.render(
             f"Salud: {self.player.health}/{self.player.max_health}",
             True, Config.GREEN,
         )
-        position_text = self.small_font.render(
-            f"Pos: ({int(self.player.x)}, {int(self.player.y)})",
-            True, Config.WHITE,
-        )
-        map_pos = self.player.get_map_position()
-        tile_text = self.small_font.render(
-            f"Tile: ({map_pos[0]}, {map_pos[1]})",
-            True, Config.WHITE,
-        )
-        angle_text = self.small_font.render(
-            f"Ángulo: {int(math.degrees(self.player.angle))}°",
-            True, Config.WHITE,
-        )
-        fps_text = self.small_font.render(
-            f"FPS: {self.clock.get_fps():.0f}",
-            True, Config.GREEN,
-        )
-        controls_text = self.small_font.render(
-            "WASD: Mover | Mouse: Mirar | ESC: Pausa",
-            True, Config.GRAY,
-        )
-
-        self.screen.blit(health_text, (Config.SCREEN_WIDTH - 250, 10))
-        self.screen.blit(position_text, (Config.SCREEN_WIDTH - 250, 40))
-        self.screen.blit(tile_text, (Config.SCREEN_WIDTH - 250, 70))
-        self.screen.blit(angle_text, (Config.SCREEN_WIDTH - 250, 100))
-        self.screen.blit(fps_text, (Config.SCREEN_WIDTH - 250, 130))
-        self.screen.blit(controls_text, (10, Config.SCREEN_HEIGHT - 30))
+        # Solo mostrar salud en grande
+        health_pos = (20, Config.SCREEN_HEIGHT - health_text.get_height() - 20)
+        self.screen.blit(health_text, health_pos)
 
         # Overlay de sangre cuando recibe daño
         self._draw_blood_overlay()
+        # Overlay de curación (flash verde)
+        self._draw_heal_overlay()
+        # Panel de cartel cercano
+        self._draw_sign_panel()
+        # HUD de boost de velocidad
+        self._draw_speed_timer()
+        # Panel de cartel cercano
+        self._draw_sign_panel()
 
-        # Mostrar palabras reconocidas por voz (debajo del minimapa)
-        if self.voice_handler is None and self._voice_error:
-            voice_text = self.small_font.render(
-                f"Voz: desactivada ({self._voice_error})", True, Config.RED
-            )
-            self.screen.blit(voice_text, (10, 70))
-        else:
-            with self._voice_lock:
-                words = list(self.recognized_words)
-            txt = "Voz: " + (" ".join(words[-8:]) if words else "(esperando...)")
-            voice_text = self.small_font.render(txt, True, Config.YELLOW)
-            self.screen.blit(voice_text, (10, 70))
+        # Ocultar chat/estado de voz y otros indicadores no esenciales en pantalla
 
     def render_pause(self):
         """Renderiza menú de pausa"""
@@ -470,17 +455,97 @@ class GameEngine:
         with self._voice_lock:
             for p in parts:
                 self.recognized_words.append(p)
-        # Intentar castear hechizo a partir del texto (solo fireball de momento)
+        # Intentar castear el hechizo reconocido (ahora soporta varios comandos)
         try:
             if self.voice_handler:
                 spell_name = self.voice_handler.text_to_spell(text.lower())
-                if spell_name == "fireball":
-                    self.spells.cast_spell(spell_name)
-                    # animación de manos al castear
-                    try:
-                        if hasattr(self, 'hud_hands') and self.hud_hands is not None:
-                            self.hud_hands.trigger_cast()
-                    except Exception:
-                        pass
+                if spell_name:
+                    spell = self.spells.cast_spell(spell_name)
+                    # animación de manos al castear si se lanzó algo
+                    if spell:
+                        try:
+                            if hasattr(self, 'hud_hands') and self.hud_hands is not None:
+                                self.hud_hands.trigger_cast()
+                        except Exception:
+                            pass
+                        # Flash verde si es curación
+                        if spell_name == "healing":
+                            self.heal_flash_timer = self.heal_flash_duration
         except Exception:
             pass
+
+    def _draw_heal_overlay(self):
+        """Overlay verdoso corto al curar."""
+        if self.heal_flash_timer <= 0:
+            return
+        alpha = int(180 * max(0.0, min(1.0, self.heal_flash_timer / self.heal_flash_duration)))
+        try:
+            overlay = pygame.Surface((Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT), pygame.SRCALPHA)
+            overlay.fill((50, 180, 100, alpha))
+            self.screen.blit(overlay, (0, 0))
+        except Exception:
+            pass
+        self.heal_flash_timer -= self.clock.get_time() / 1000.0
+
+    def _update_sign_overlay(self, dt):
+        """Calcula si hay un cartel cerca y ajusta el alpha para el fade."""
+        message = None
+        signs = getattr(self.map_manager, "signs", None)
+        if signs:
+            px, py = self.player.x, self.player.y
+            threshold = Config.TILE_SIZE * 1.2  # radio más corto para no solapar carteles
+            for (col, row), msg in signs.items():
+                cx = col * Config.TILE_SIZE + Config.TILE_SIZE * 0.5
+                cy = row * Config.TILE_SIZE + Config.TILE_SIZE * 0.5
+                if math.hypot(cx - px, cy - py) <= threshold:
+                    message = msg
+                    break
+
+        self.sign_target_alpha = 1.0 if message else 0.0
+        fade_speed = 3.5
+        if self.sign_target_alpha > self.sign_alpha:
+            self.sign_alpha = min(self.sign_target_alpha, self.sign_alpha + dt * fade_speed)
+        else:
+            self.sign_alpha = max(self.sign_target_alpha, self.sign_alpha - dt * fade_speed)
+        self.sign_message = message
+
+    def _draw_sign_panel(self):
+        """Dibuja el panel semi-transparente del cartel cercano."""
+        if self.sign_alpha <= 0 or not self.sign_message:
+            return
+        panel_w = min(Config.SCREEN_WIDTH - 80, int(Config.SCREEN_WIDTH * 0.6))
+        panel_h = 120
+        surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        bg_alpha = int(170 * self.sign_alpha)
+        surf.fill((10, 20, 10, bg_alpha))
+        try:
+            pygame.draw.rect(surf, (80, 180, 120, min(255, bg_alpha + 50)), surf.get_rect(), 2)
+        except Exception:
+            pass
+
+        y = 15
+        for line in self.sign_message.split("\n"):
+            text_surf = self.small_font.render(line, True, Config.WHITE)
+            surf.blit(text_surf, (20, y))
+            y += text_surf.get_height() + 6
+
+        x = (Config.SCREEN_WIDTH - panel_w) // 2
+        y = 40
+        self.screen.blit(surf, (x, y))
+
+    def _draw_speed_timer(self):
+        """Muestra un cronómetro del boost de velocidad si está activo."""
+        timer = getattr(self.player, "speed_boost_timer", 0.0)
+        mult = getattr(self.player, "speed_boost_multiplier", 1.0)
+        if timer <= 0 or mult <= 1.01:
+            return
+        text = self.small_font.render(f"Velocidad x{mult:.1f} - {timer:0.1f}s", True, Config.YELLOW)
+        pad = 10
+        bg = pygame.Surface((text.get_width() + pad * 2, text.get_height() + pad * 2), pygame.SRCALPHA)
+        bg.fill((20, 20, 0, 160))
+        try:
+            pygame.draw.rect(bg, (200, 180, 50, 220), bg.get_rect(), 2)
+        except Exception:
+            pass
+        bg.blit(text, (pad, pad))
+        self.screen.blit(bg, (Config.SCREEN_WIDTH - bg.get_width() - 16, Config.SCREEN_HEIGHT - 80))

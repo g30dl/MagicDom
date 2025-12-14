@@ -5,7 +5,7 @@ from .spell_base import SpellBase
 
 
 class Healing(SpellBase):
-    def __init__(self, x: float, y: float, angle: float, amount: int = 20):
+    def __init__(self, x: float, y: float, angle: float, amount: int = 30):
         super().__init__(
             name="healing",
             x=x,
