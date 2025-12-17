@@ -34,6 +34,8 @@ class GameEngine:
         self.map_manager = MapManager()
         game_map = self.map_manager.get_map()
         self.enemy_spawns = getattr(self.map_manager, "enemy_spawns", [])
+        self.boss_spawns = getattr(self.map_manager, "boss_spawns", [])
+        self.has_boss = bool(self.boss_spawns)
         self.renderer = Renderer(screen, self.map_manager)
         self.keyboard_handler = KeyboardHandler()
         self.sound_manager = self._init_sound_manager()
@@ -78,6 +80,7 @@ class GameEngine:
         self.font = pygame.font.Font(None, 36)
         self.small_font = pygame.font.Font(None, 24)
         self.health_font = pygame.font.Font(None, 54)
+        self.status_avatar = self._load_status_avatar()
 
         # Iniciar escucha continua de voz (si es posible)
         try:
@@ -119,6 +122,8 @@ class GameEngine:
                 self.update_pause()
             elif current_state == GameState.GAME_OVER:
                 self.update_game_over()
+            elif current_state == GameState.VICTORY:
+                self.update_victory()
 
             # Renderizar
             self.render(current_state)
@@ -137,6 +142,15 @@ class GameEngine:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+            # Toggle pausa con evento personalizado desde teclado
+            if event.type == pygame.USEREVENT and event.dict.get("action") == "toggle_pause":
+                current_state = self.state_manager.get_state()
+                if current_state == GameState.PLAYING:
+                    self.state_manager.change_state(GameState.PAUSED)
+                    self.keyboard_handler.release_mouse()
+                elif current_state == GameState.PAUSED:
+                    self.state_manager.change_state(GameState.PLAYING)
+                    self.keyboard_handler.capture_mouse()
 
             # Manejo de estados con ESC
             if event.type == pygame.KEYDOWN:
@@ -172,6 +186,13 @@ class GameEngine:
         try:
             self.enemy_manager.update_all(dt, self.player)
             self.enemy_manager.remove_dead()
+        except Exception:
+            pass
+        # Chequear victoria (boss derrotado)
+        try:
+            if self.has_boss and self.enemy_manager.get_boss_alive_count() == 0:
+                self.state_manager.change_state(GameState.VICTORY)
+                self.keyboard_handler.release_mouse()
         except Exception:
             pass
 
@@ -218,6 +239,14 @@ class GameEngine:
         if keys[pygame.K_ESCAPE]:
             self.running = False
 
+    def update_victory(self):
+        """Pantalla de victoria espera input."""
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_r]:
+            self._restart_game()
+        if keys[pygame.K_ESCAPE]:
+            self.running = False
+
     def render(self, state):
         """Renderiza el frame actual"""
         self.screen.fill(Config.BLACK)
@@ -230,6 +259,8 @@ class GameEngine:
             self.render_pause()
         elif state == GameState.GAME_OVER:
             self.render_game_over()
+        elif state == GameState.VICTORY:
+            self.render_victory()
 
     def render_menu(self):
         """Renderiza el menú principal"""
@@ -284,9 +315,8 @@ class GameEngine:
             f"Salud: {self.player.health}/{self.player.max_health}",
             True, Config.GREEN,
         )
-        # Solo mostrar salud en grande
-        health_pos = (20, Config.SCREEN_HEIGHT - health_text.get_height() - 20)
-        self.screen.blit(health_text, health_pos)
+        # Barra de estado estilo DOOM (avatar + vida)
+        self._draw_status_bar()
 
         # Overlay de sangre cuando recibe daño
         self._draw_blood_overlay()
@@ -296,10 +326,119 @@ class GameEngine:
         self._draw_sign_panel()
         # HUD de boost de velocidad
         self._draw_speed_timer()
-        # Panel de cartel cercano
-        self._draw_sign_panel()
 
         # Ocultar chat/estado de voz y otros indicadores no esenciales en pantalla
+
+    def _draw_health_bar(self):
+        """Dibuja una barra de vida en la esquina inferior izquierda."""
+        try:
+            current = max(0, min(self.player.health, self.player.max_health))
+            ratio = current / self.player.max_health if self.player.max_health > 0 else 0
+        except Exception:
+            return
+
+        bar_width = 280
+        bar_height = 18
+        x = 20
+        y = Config.SCREEN_HEIGHT - bar_height - 10
+
+        # Fondo y borde
+        try:
+            pygame.draw.rect(self.screen, (40, 40, 40), (x, y, bar_width, bar_height))
+            pygame.draw.rect(self.screen, Config.WHITE, (x, y, bar_width, bar_height), 2)
+        except Exception:
+            pass
+
+        fill_w = int(bar_width * ratio)
+        fill_color = Config.GREEN if ratio > 0.35 else Config.RED
+        try:
+            pygame.draw.rect(self.screen, fill_color, (x + 2, y + 2, max(0, fill_w - 4), bar_height - 4))
+        except Exception:
+            pass
+
+    def _draw_status_bar(self):
+        """Barra de estado estilo DOOM con avatar y vida."""
+        bar_h = 110
+        y = Config.SCREEN_HEIGHT - bar_h
+        try:
+            surf = pygame.Surface((Config.SCREEN_WIDTH, bar_h), pygame.SRCALPHA)
+            surf.fill((30, 10, 40, 210))  # tono morado oscuro translúcido
+            pygame.draw.rect(surf, (140, 90, 180, 230), surf.get_rect(), 2)
+            self.screen.blit(surf, (0, y))
+        except Exception:
+            pass
+
+        avatar_size = bar_h - 14  # más grande
+        if self.status_avatar:
+            try:
+                avatar = pygame.transform.smoothscale(self.status_avatar, (avatar_size, avatar_size))
+                ax = 16
+                ay = y + (bar_h - avatar_size) // 2
+                self.screen.blit(avatar, (ax, ay))
+            except Exception:
+                pass
+            bar_x = 16 + avatar_size + 16
+        else:
+            bar_x = 16
+
+        # Dibujar barra de vida dentro del status bar
+        try:
+            current = max(0, min(self.player.health, self.player.max_health))
+            ratio = current / self.player.max_health if self.player.max_health > 0 else 0
+        except Exception:
+            return
+        bar_width = 320
+        bar_height = 22
+        bar_y = y + (bar_h - bar_height) // 2
+        try:
+            pygame.draw.rect(self.screen, (35, 20, 50), (bar_x, bar_y, bar_width, bar_height))
+            pygame.draw.rect(self.screen, (200, 160, 230), (bar_x, bar_y, bar_width, bar_height), 2)
+            fill_w = int(bar_width * ratio)
+            fill_color = (120, 220, 120) if ratio > 0.35 else (220, 60, 80)
+            pygame.draw.rect(self.screen, fill_color, (bar_x + 2, bar_y + 2, max(0, fill_w - 4), bar_height - 4))
+        except Exception:
+            pass
+        # Texto pequeño de vida
+        try:
+            txt = self.small_font.render(f"{current}/{self.player.max_health}", True, Config.WHITE)
+            self.screen.blit(txt, (bar_x + bar_width + 12, bar_y + (bar_height - txt.get_height()) // 2))
+        except Exception:
+            pass
+
+        # Barra de maná (decorativa si no hay stats de maná)
+        mana_max = getattr(self.player, "mana_max", 100)
+        mana = getattr(self.player, "mana", mana_max)
+        try:
+            mana_ratio = max(0, min(mana, mana_max)) / mana_max if mana_max > 0 else 0
+        except Exception:
+            mana_ratio = 0
+        mana_width = 200
+        mana_height = 14
+        mana_x = bar_x
+        mana_y = bar_y + bar_height + 12
+        try:
+            pygame.draw.rect(self.screen, (25, 15, 40), (mana_x, mana_y, mana_width, mana_height))
+            pygame.draw.rect(self.screen, (160, 120, 220), (mana_x, mana_y, mana_width, mana_height), 2)
+            fill_w = int(mana_width * mana_ratio)
+            pygame.draw.rect(self.screen, (80, 160, 255), (mana_x + 2, mana_y + 2, max(0, fill_w - 4), mana_height - 4))
+        except Exception:
+            pass
+        try:
+            mana_txt = self.small_font.render(f"Mana", True, Config.WHITE)
+            self.screen.blit(mana_txt, (mana_x + mana_width + 10, mana_y + (mana_height - mana_txt.get_height()) // 2))
+        except Exception:
+            pass
+
+
+    def _load_status_avatar(self):
+        """Carga la imagen de avatar para la barra de estado."""
+        path = "assets/sprites/visualbrand.png"
+        try:
+            if os.path.exists(path):
+                return pygame.image.load(path).convert_alpha()
+        except Exception:
+            return None
+        return None
 
     def render_pause(self):
         """Renderiza menú de pausa"""
@@ -314,11 +453,13 @@ class GameEngine:
 
         pause_text = self.font.render("PAUSA", True, Config.YELLOW)
         resume = self.small_font.render("R - Reanudar", True, Config.WHITE)
+        toggle = self.small_font.render("P - Pausar/Reanudar", True, Config.WHITE)
         menu = self.small_font.render("M - Menú Principal", True, Config.WHITE)
 
         self.screen.blit(pause_text, (Config.SCREEN_WIDTH // 2 - pause_text.get_width() // 2, 250))
         self.screen.blit(resume, (Config.SCREEN_WIDTH // 2 - resume.get_width() // 2, 350))
-        self.screen.blit(menu, (Config.SCREEN_WIDTH // 2 - menu.get_width() // 2, 400))
+        self.screen.blit(toggle, (Config.SCREEN_WIDTH // 2 - toggle.get_width() // 2, 390))
+        self.screen.blit(menu, (Config.SCREEN_WIDTH // 2 - menu.get_width() // 2, 430))
 
     def render_game_over(self):
         """Pantalla de Game Over con opciones."""
@@ -338,12 +479,30 @@ class GameEngine:
         self.screen.blit(retry, (Config.SCREEN_WIDTH // 2 - retry.get_width() // 2, 340))
         self.screen.blit(quit_text, (Config.SCREEN_WIDTH // 2 - quit_text.get_width() // 2, 380))
 
+    def render_victory(self):
+        """Pantalla de Victoria."""
+        self.renderer.render_3d_view(self.player)
+
+        overlay = pygame.Surface((Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT))
+        overlay.set_alpha(180)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0, 0))
+
+        title = self.font.render("YOU WIN!", True, Config.YELLOW)
+        retry = self.small_font.render("R - Reiniciar", True, Config.WHITE)
+        quit_text = self.small_font.render("ESC - Salir", True, Config.WHITE)
+
+        self.screen.blit(title, (Config.SCREEN_WIDTH // 2 - title.get_width() // 2, 240))
+        self.screen.blit(retry, (Config.SCREEN_WIDTH // 2 - retry.get_width() // 2, 340))
+        self.screen.blit(quit_text, (Config.SCREEN_WIDTH // 2 - quit_text.get_width() // 2, 380))
+
     def _spawn_initial_enemies(self):
         """Spawnea enemigos marcados en el mapa (celda 9). Si no hay, usa fallback alejado."""
         if not self.enemy_manager:
             return
 
         spawn_tiles = list(self.enemy_spawns or [])
+        boss_tiles = list(getattr(self.map_manager, "boss_spawns", []) or [])
         if not spawn_tiles:
             spawn_tiles = self._pick_enemy_spawn_tiles(count=3, min_distance=Config.TILE_SIZE * 4)
 
@@ -352,6 +511,14 @@ class GameEngine:
             y = row * Config.TILE_SIZE + Config.TILE_SIZE // 2
             try:
                 self.enemy_manager.add_enemy(x, y, enemy_type="rockbad")
+            except Exception:
+                continue
+
+        for col, row in boss_tiles:
+            x = col * Config.TILE_SIZE + Config.TILE_SIZE // 2
+            y = row * Config.TILE_SIZE + Config.TILE_SIZE // 2
+            try:
+                self.enemy_manager.add_enemy(x, y, enemy_type="cyber_demon", is_boss=True)
             except Exception:
                 continue
 

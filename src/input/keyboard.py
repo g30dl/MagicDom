@@ -36,23 +36,28 @@ class KeyboardHandler:
         speed = player.move_speed
         if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
             speed *= getattr(Config, "PLAYER_SPRINT_MULT", 1.5)
-        
+
         # Aplicar movimiento (CORREGIDO: ahora pasa dt correctamente)
         if forward != 0 or strafe != 0:
             player.move(forward, strafe, dt, speed=speed)
-        
+
         # Rotación con flechas (alternativa al mouse)
         if keys[pygame.K_LEFT]:
             player.rotate(-1, dt)
         if keys[pygame.K_RIGHT]:
             player.rotate(1, dt)
-        
+
+        # Pausa con P
+        if keys[pygame.K_p]:
+            # Toggle en engine mediante estado; aquí solo se señala
+            pygame.event.post(pygame.event.Event(pygame.USEREVENT, {"action": "toggle_pause"}))
+
         # Mouse para rotación (CORREGIDO: ahora funciona correctamente)
         if pygame.event.get_grab():  # Solo si el mouse está capturado
             mouse_dx, mouse_dy = pygame.mouse.get_rel()
             if mouse_dx != 0:
                 player.rotate(mouse_dx * self.mouse_sensitivity, dt)
-    
+
     def release_mouse(self):
         """Libera el mouse (para menús)"""
         pygame.mouse.set_visible(True)

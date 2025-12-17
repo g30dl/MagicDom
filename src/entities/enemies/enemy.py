@@ -97,6 +97,17 @@ ENEMY_PRESETS = {
         "radius": Config.TILE_SIZE * 0.2,
         "sprite_scale": 1.1,
     },
+    "cyber_demon": {
+        "asset_path": os.path.join("assets", "enemies", "cyber_demon"),
+        "health": 260,
+        "damage": 18,
+        "speed": 1.2,
+        "attack_cooldown": 1.4,
+        "attack_range": Config.TILE_SIZE * 2.4,
+        "detection_range": Config.TILE_SIZE * 11,
+        "radius": Config.TILE_SIZE * 0.22,
+        "sprite_scale": 1.25,
+    },
     "basic": {
         "asset_path": os.path.join("assets", "enemies", "RockBad"),
         "health": 50,
@@ -112,7 +123,7 @@ ENEMY_PRESETS = {
 
 
 class Enemy:
-    def __init__(self, x, y, enemy_type="basic", game_map=None):
+    def __init__(self, x, y, enemy_type="basic", game_map=None, is_boss=False):
         self.x = float(x)
         self.y = float(y)
         self.type = enemy_type.lower()
@@ -120,6 +131,7 @@ class Enemy:
         self._dying = False
         self.death_animation_done = False
         self.game_map = game_map
+        self.is_boss = bool(is_boss)
 
         preset = ENEMY_PRESETS.get(self.type, ENEMY_PRESETS["basic"])
         self.health = preset.get("health", 50)
@@ -444,9 +456,8 @@ class Enemy:
 
         if self.frozen_timer > 0:
             self.frozen_timer -= dt
-            self.state = "idle"
-            self._switch_animation("idle")
-            self._update_animation(dt)
+            self.state = "frozen"
+            # Sin animación ni cambio de frame: se queda en el frame actual
             return
 
         if self.state == "death":
@@ -518,9 +529,6 @@ class Enemy:
         elif damage_type == "frost":
             # Congelar por 3.5 segundos al recibir frost
             self.frozen_timer = max(self.frozen_timer, 3.5)
-            if hasattr(self, "frozen_frame") and self.frozen_frame:
-                self._current_anim = SpriteAnimation([self.frozen_frame], frame_time=0.5, loop=True)
-                self._current_anim_name = "frozen"
 
         actual_damage = int(damage * multiplier)
         self.health -= actual_damage
@@ -569,8 +577,8 @@ class EnemyManager:
         for enemy in self.enemies:
             enemy.game_map = game_map
 
-    def add_enemy(self, x, y, enemy_type="rockbad"):
-        enemy = Enemy(x, y, enemy_type, game_map=self.game_map)
+    def add_enemy(self, x, y, enemy_type="rockbad", is_boss=False):
+        enemy = Enemy(x, y, enemy_type, game_map=self.game_map, is_boss=is_boss)
         self.enemies.append(enemy)
         return enemy
 
@@ -589,6 +597,9 @@ class EnemyManager:
 
     def get_enemy_count(self):
         return len(self.get_alive_enemies())
+
+    def get_boss_alive_count(self):
+        return len([e for e in self.enemies if getattr(e, "is_boss", False) and e.alive])
 
     def clear_all(self):
         self.enemies.clear()

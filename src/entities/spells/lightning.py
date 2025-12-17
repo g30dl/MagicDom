@@ -17,7 +17,7 @@ class Lightning(SpellBase):
             speed=0.0,
             damage=35,
             lifetime=1.0,
-            color=(120, 200, 255),
+            color=(255, 220, 80),
         )
         self.strike_points = []
         self.active_strikes = []
