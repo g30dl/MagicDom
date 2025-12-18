@@ -1,10 +1,8 @@
-"""
-Sistema de gestión de audio
-Maneja música y efectos de sonido
-"""
-import pygame
+"""Sistema de gestion de audio para musica y efectos."""
 import os
+import pygame
 from src.game.config import Config
+
 
 class SoundManager:
     def __init__(self):
@@ -17,43 +15,60 @@ class SoundManager:
             print(f"[Audio] Mixer no disponible: {e}")
             return
 
-        # Diccionarios para almacenar sonidos
         self.music_tracks = {}
         self.sound_effects = {}
-        
-        # Cargar recursos de audio
+        self.track_volume_scale = {
+            "background": getattr(Config, "BACKGROUND_VOLUME_SCALE", 1.0),
+            "playing_theme": getattr(Config, "BACKGROUND_VOLUME_SCALE", 1.0),
+            "playing": getattr(Config, "BACKGROUND_VOLUME_SCALE", 1.0),
+        }
+        self.current_track = None
+
         self.load_audio()
-        
-        # Configurar volúmenes
+
         try:
             pygame.mixer.music.set_volume(Config.MUSIC_VOLUME)
         except Exception as e:
             print(f"[Audio] No se pudo ajustar volumen: {e}")
             self.enabled = False
-    
+
+    def _register_music_track(self, name, filepath, override=False):
+        """
+        Registra una pista si existe. Si override es True reemplaza la previa.
+        """
+        if not os.path.exists(filepath):
+            print(f"Advertencia: No se encontro {filepath}")
+            return
+        if name in self.music_tracks and not override:
+            return
+        self.music_tracks[name] = filepath
+        print(f"Registrada musica: {name}")
+
     def load_audio(self):
-        """
-        Carga archivos de audio desde la carpeta assets/sounds
-        """
+        """Carga archivos de audio desde assets/music/sounds y assets/music."""
         if not self.enabled:
             return
-        # Rutas de audio
-        sounds_path = "assets/sounds"
+
+        sounds_path = os.path.join("assets", "music", "sounds")
         music_path = "assets/music"
-        
-        # Crear directorios si no existen
+
         os.makedirs(sounds_path, exist_ok=True)
         os.makedirs(music_path, exist_ok=True)
-        
-        # Intentar cargar efectos de sonido
+
         sound_files = {
-            "fireball": "fireball.wav",
-            "lightning": "lightning.wav",
-            "error": "error.wav",
-            "hit": "hit.wav",
-            "death": "death.wav",
+            "fireball": "fire.wav",
+            "hit": "fire.wav",
+            "frost": "fire.wav",
+            "lightning": "rayos.wav",
+            "healing": "heal.wav",
+            "heal": "heal.wav",
+            "speed": "controller_button_press_2.wav",
+            "menu_click": "controller_button_press_2.wav",
+            "error": "controller_button_press_2.wav",
+            "death": "lost.wav",
+            "lost": "lost.wav",
         }
-        
+
         for name, filename in sound_files.items():
             filepath = os.path.join(sounds_path, filename)
             if os.path.exists(filepath):
@@ -64,72 +79,107 @@ class SoundManager:
                 except Exception as e:
                     print(f"Error cargando {filename}: {e}")
             else:
-                print(f"Advertencia: No se encontró {filepath}")
-        
-        # Música de fondo
-        music_files = {
-            "background": "background.mp3",
-            "menu": "menu.mp3",
+                print(f"Advertencia: No se encontro {filepath}")
+
+        # Efectos de enemigos ubicados en assets/music/<enemigo>/attack.*
+        enemy_sfx = {
+            "rockybad_attack": os.path.join("assets", "music", "rockybad", "attack.wav"),
+            "cyber_demon_hit": os.path.join("assets", "music", "Cyber_demon", "hit.wav"),
         }
-        
-        for name, filename in music_files.items():
-            filepath = os.path.join(music_path, filename)
+        for name, filepath in enemy_sfx.items():
             if os.path.exists(filepath):
-                self.music_tracks[name] = filepath
-                print(f"Registrada música: {name}")
+                try:
+                    self.sound_effects[name] = pygame.mixer.Sound(filepath)
+                    self.sound_effects[name].set_volume(Config.SFX_VOLUME)
+                    print(f"Cargado efecto: {name}")
+                except Exception as e:
+                    print(f"Error cargando {filepath}: {e}")
             else:
-                print(f"Advertencia: No se encontró {filepath}")
-    
+                print(f"Advertencia: No se encontro {filepath}")
+
+        base_music = {
+            "background": os.path.join(music_path, "background.mp3"),
+            "menu": os.path.join(music_path, "menu.mp3"),
+        }
+        for name, filepath in base_music.items():
+            self._register_music_track(name, filepath)
+
+        theme_path = os.path.join(music_path, "theme")
+        os.makedirs(theme_path, exist_ok=True)
+        theme_music = {
+            "menu_theme": os.path.join(theme_path, "menu.mp3"),
+            "menu": os.path.join(theme_path, "menu.mp3"),
+            "playing_theme": os.path.join(theme_path, "playing.mp3"),
+            "playing": os.path.join(theme_path, "playing.mp3"),
+            "background": os.path.join(theme_path, "playing.mp3"),
+        }
+        for name, filepath in theme_music.items():
+            self._register_music_track(name, filepath, override=True)
+
     def play_sfx(self, sound_name):
-        """Reproduce un efecto de sonido"""
+        """Reproduce un efecto de sonido."""
         if not self.enabled:
             return
         if sound_name in self.sound_effects:
             self.sound_effects[sound_name].play()
         else:
             print(f"Efecto de sonido no encontrado: {sound_name}")
-    
+
     def play_music(self, track_name, loops=-1):
         """
-        Reproduce música de fondo
-        loops=-1 significa loop infinito
+        Reproduce musica de fondo. loops=-1 significa loop infinito.
         """
         if not self.enabled:
             return
         if track_name in self.music_tracks:
             try:
                 pygame.mixer.music.load(self.music_tracks[track_name])
+                self.current_track = track_name
+                self._apply_track_volume(track_name)
                 pygame.mixer.music.play(loops)
-                print(f"Reproduciendo música: {track_name}")
+                print(f"Reproduciendo musica: {track_name}")
             except Exception as e:
-                print(f"Error reproduciendo música {track_name}: {e}")
+                self.current_track = None
+                print(f"Error reproduciendo musica {track_name}: {e}")
         else:
-            print(f"Pista de música no encontrada: {track_name}")
-    
+            print(f"Pista de musica no encontrada: {track_name}")
+
     def stop_music(self):
-        """Detiene la música actual"""
+        """Detiene la musica actual."""
         if self.enabled:
             pygame.mixer.music.stop()
-    
+            self.current_track = None
+
     def pause_music(self):
-        """Pausa la música actual"""
+        """Pausa la musica actual."""
         if self.enabled:
             pygame.mixer.music.pause()
-    
+
     def resume_music(self):
-        """Resume la música pausada"""
+        """Resume la musica pausada."""
         if self.enabled:
             pygame.mixer.music.unpause()
-    
+
     def set_music_volume(self, volume):
-        """Ajusta el volumen de la música (0.0 a 1.0)"""
+        """Ajusta el volumen de la musica (0.0 a 1.0)."""
         Config.MUSIC_VOLUME = max(0.0, min(1.0, volume))
         if self.enabled:
-            pygame.mixer.music.set_volume(Config.MUSIC_VOLUME)
-    
+            self._apply_track_volume(self.current_track)
+
     def set_sfx_volume(self, volume):
-        """Ajusta el volumen de los efectos de sonido (0.0 a 1.0)"""
+        """Ajusta el volumen de los efectos de sonido (0.0 a 1.0)."""
         Config.SFX_VOLUME = max(0.0, min(1.0, volume))
         if self.enabled:
             for sound in self.sound_effects.values():
                 sound.set_volume(Config.SFX_VOLUME)
+
+    def _apply_track_volume(self, track_name):
+        """Aplica el volumen global con el factor personalizado de la pista."""
+        if not self.enabled:
+            return
+        scale = self.track_volume_scale.get(track_name, 1.0) if track_name else 1.0
+        volume = max(0.0, min(1.0, Config.MUSIC_VOLUME * scale))
+        try:
+            pygame.mixer.music.set_volume(volume)
+        except Exception as e:
+            print(f"[Audio] No se pudo ajustar volumen: {e}")

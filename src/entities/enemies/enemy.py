@@ -123,7 +123,7 @@ ENEMY_PRESETS = {
 
 
 class Enemy:
-    def __init__(self, x, y, enemy_type="basic", game_map=None, is_boss=False):
+    def __init__(self, x, y, enemy_type="basic", game_map=None, is_boss=False, sound_manager=None):
         self.x = float(x)
         self.y = float(y)
         self.type = enemy_type.lower()
@@ -132,6 +132,7 @@ class Enemy:
         self.death_animation_done = False
         self.game_map = game_map
         self.is_boss = bool(is_boss)
+        self.sound_manager = sound_manager
 
         preset = ENEMY_PRESETS.get(self.type, ENEMY_PRESETS["basic"])
         self.health = preset.get("health", 50)
@@ -514,10 +515,20 @@ class Enemy:
                 self.x = new_x
                 self.y = new_y
 
+    def _play_sound(self, sound_name):
+        """Reproduce un sfx a través del sound manager si está disponible."""
+        if self.sound_manager:
+            try:
+                self.sound_manager.play_sfx(sound_name)
+            except Exception:
+                pass
+
     def attack_player(self, player):
         """Ataca al jugador con daño fijo."""
         player.take_damage(self.damage)
         print(f"Enemigo {self.type} ataca. Daño: {self.damage}")
+        if self.type == "rockbad":
+            self._play_sound("rockybad_attack")
 
     def take_damage(self, damage, damage_type=None):
         """Recibe daño y activa animación de dolor."""
@@ -533,6 +544,8 @@ class Enemy:
         actual_damage = int(damage * multiplier)
         self.health -= actual_damage
         print(f"Enemigo {self.type} recibe {actual_damage} de daño")
+        if self.type == "cyber_demon":
+            self._play_sound("cyber_demon_hit")
 
         if self.health <= 0:
             self.die()
@@ -568,9 +581,10 @@ class Enemy:
 class EnemyManager:
     """Administrador de todos los enemigos en el nivel."""
 
-    def __init__(self, game_map=None):
+    def __init__(self, game_map=None, sound_manager=None):
         self.enemies = []
         self.game_map = game_map
+        self.sound_manager = sound_manager
 
     def set_map(self, game_map):
         self.game_map = game_map
@@ -578,7 +592,14 @@ class EnemyManager:
             enemy.game_map = game_map
 
     def add_enemy(self, x, y, enemy_type="rockbad", is_boss=False):
-        enemy = Enemy(x, y, enemy_type, game_map=self.game_map, is_boss=is_boss)
+        enemy = Enemy(
+            x,
+            y,
+            enemy_type,
+            game_map=self.game_map,
+            is_boss=is_boss,
+            sound_manager=self.sound_manager,
+        )
         self.enemies.append(enemy)
         return enemy
 

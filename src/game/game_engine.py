@@ -39,6 +39,9 @@ class GameEngine:
         self.renderer = Renderer(screen, self.map_manager)
         self.keyboard_handler = KeyboardHandler()
         self.sound_manager = self._init_sound_manager()
+        self.current_music = None
+        self._menu_enter_down = False
+        self._game_over_sound_played = False
         self.blood_surface = self._load_blood_overlay()
         self.blood_timer = 0.0
         self.blood_duration = 0.7
@@ -74,7 +77,7 @@ class GameEngine:
         self.player.on_hit_callback = self._on_player_hit
 
         # Enemigos y mapa para IA
-        self.enemy_manager = EnemyManager(game_map)
+        self.enemy_manager = EnemyManager(game_map, sound_manager=self.sound_manager)
 
         # Font para UI
         self.font = pygame.font.Font(None, 36)
@@ -103,6 +106,9 @@ class GameEngine:
         # Spawns iniciales
         self._spawn_initial_enemies()
 
+        # Musica inicial (menu)
+        self._update_music_for_state(self.state_manager.get_state())
+
     def run(self):
         """Loop principal del juego"""
         while self.running:
@@ -125,8 +131,11 @@ class GameEngine:
             elif current_state == GameState.VICTORY:
                 self.update_victory()
 
+            active_state = self.state_manager.get_state()
+            self._update_music_for_state(active_state)
+
             # Renderizar
-            self.render(current_state)
+            self.render(active_state)
 
             pygame.display.flip()
 
@@ -168,9 +177,20 @@ class GameEngine:
     def update_menu(self):
         """Actualiza lógica del menú"""
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_RETURN]:
+        enter_down = keys[pygame.K_RETURN]
+        if enter_down and not self._menu_enter_down:
+            if self.sound_manager:
+                try:
+                    self.sound_manager.play_sfx("menu_click")
+                except Exception:
+                    pass
+        if enter_down:
             self.state_manager.change_state(GameState.PLAYING)
             self.keyboard_handler.capture_mouse()
+        if not enter_down:
+            self._menu_enter_down = False
+        else:
+            self._menu_enter_down = True
 
     def update_game(self, dt):
         """Actualiza lógica del juego"""
@@ -218,6 +238,12 @@ class GameEngine:
 
         # Check muerte del jugador
         if not self.player.is_alive():
+            if not self._game_over_sound_played and self.sound_manager:
+                try:
+                    self.sound_manager.play_sfx("lost")
+                except Exception:
+                    pass
+                self._game_over_sound_played = True
             self.state_manager.change_state(GameState.GAME_OVER)
             self.keyboard_handler.release_mouse()
 
@@ -580,6 +606,11 @@ class GameEngine:
                 self.voice_handler.stop()
         except Exception:
             pass
+        try:
+            if self.sound_manager:
+                self.sound_manager.stop_music()
+        except Exception:
+            pass
         screen = self.screen
         # Re-inicializar todo
         self.__init__(screen)
@@ -613,6 +644,32 @@ class GameEngine:
         except Exception as e:
             print(f"[Audio] Desactivado: {e}")
             return None
+
+    def _update_music_for_state(self, state):
+        """Activa la pista correcta segun el estado del juego."""
+        if not self.sound_manager or not hasattr(self.sound_manager, "music_tracks"):
+            return
+
+        tracks = self.sound_manager.music_tracks
+        desired = None
+        if state == GameState.MENU:
+            desired = "menu_theme" if "menu_theme" in tracks else "menu"
+        elif state in (
+            GameState.PLAYING,
+            GameState.PAUSED,
+            GameState.GAME_OVER,
+            GameState.VICTORY,
+        ):
+            desired = "playing_theme" if "playing_theme" in tracks else "background"
+
+        if not desired:
+            return
+        if desired not in tracks:
+            self.current_music = desired
+            return
+        if desired != self.current_music:
+            self.sound_manager.play_music(desired)
+            self.current_music = desired
 
     # Callback ejecutado por el hilo de voz
     def _on_voice_text(self, text: str):

@@ -101,6 +101,7 @@ class Config:
     
     # Configuración de audio
     MUSIC_VOLUME = 0.3
+    BACKGROUND_VOLUME_SCALE = 0.6  # baja la pista de background respecto al volumen general
     SFX_VOLUME = 0.7
 
     # HUD de manos (escala y posicionamiento)
