@@ -1,4 +1,4 @@
-# MagicDom (Mage Arena 3D)
+# MagicDom
 
 Juego experimental estilo raycasting (DOOM/Wolfenstein) escrito en Python + Pygame, con control por teclado y mouse mas comandos de voz en espanol para lanzar hechizos.
 
