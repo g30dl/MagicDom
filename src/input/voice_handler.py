@@ -121,7 +121,6 @@ class VoiceHandler:
                 return spell_name
 
         print(f"Comando no reconocido: '{text}'")
-        print(f"Comandos válidos: {', '.join(Config.SPELLS.keys())}")
         return None
 
     def test_microphone(self):

@@ -77,6 +77,15 @@ class Config:
         "relámpago": "lightning",
         "matalos a todos": "easter_kill",
     }
+    # Hotkeys de teclado para castear rápido (fila Y-U-I-O-P)
+    SPELL_HOTKEYS = {
+        "y": "fireball",
+        "u": "frost",
+        "i": "lightning",
+        "o": "healing",
+        "p": "speed",
+    }
+    SPELL_HOTKEYS_ENABLED_DEFAULT = False  # Por defecto desactivado
     
     # Fases del juego
     PHASES = {

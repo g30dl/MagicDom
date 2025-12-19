@@ -47,11 +47,6 @@ class KeyboardHandler:
         if keys[pygame.K_RIGHT]:
             player.rotate(1, dt)
 
-        # Pausa con P
-        if keys[pygame.K_p]:
-            # Toggle en engine mediante estado; aquí solo se señala
-            pygame.event.post(pygame.event.Event(pygame.USEREVENT, {"action": "toggle_pause"}))
-
         # Mouse para rotación (CORREGIDO: ahora funciona correctamente)
         if pygame.event.get_grab():  # Solo si el mouse está capturado
             mouse_dx, mouse_dy = pygame.mouse.get_rel()

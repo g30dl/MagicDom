@@ -60,6 +60,11 @@ class GameEngine:
         self._voice_lock = threading.Lock()
         self.recognized_words = deque(maxlen=10)
         self._voice_error = None
+        # Hotkeys de hechizos (fila Y-U-I-O-P) con anti-repetición
+        self._spell_hotkeys = self._build_spell_hotkeys()
+        self._hotkey_down = {key: False for key in self._spell_hotkeys}
+        self.hotkeys_enabled = bool(getattr(Config, "SPELL_HOTKEYS_ENABLED_DEFAULT", False))
+        self._menu_toggle_hotkeys_down = False
 
         # Cargar mapa y generar un punto de spawn seguro (centro de un tile libre)
         tile = getattr(Config, "SPAWN_TILE", None)
@@ -178,6 +183,17 @@ class GameEngine:
         """Actualiza lógica del menú"""
         keys = pygame.key.get_pressed()
         enter_down = keys[pygame.K_RETURN]
+        # Toggle hotkeys con H (solo una vez por pulsación)
+        toggle_down = keys[pygame.K_h]
+        if toggle_down and not self._menu_toggle_hotkeys_down:
+            self.hotkeys_enabled = not self.hotkeys_enabled
+            if self.sound_manager:
+                try:
+                    self.sound_manager.play_sfx("menu_click")
+                except Exception:
+                    pass
+        self._menu_toggle_hotkeys_down = toggle_down
+
         if enter_down and not self._menu_enter_down:
             if self.sound_manager:
                 try:
@@ -196,6 +212,8 @@ class GameEngine:
         """Actualiza lógica del juego"""
         # Actualizar jugador con input de teclado/mouse
         self.keyboard_handler.update(self.player, dt)
+        # Hotkeys de hechizo
+        self._handle_spell_hotkeys()
 
         # Actualizar jugador
         self.player.update(dt)
@@ -291,6 +309,8 @@ class GameEngine:
         """Renderiza el menú principal"""
         start = self.small_font.render("Presiona ENTER para jugar", True, Config.WHITE)
         quit_text = self.small_font.render("Presiona ESC para salir", True, Config.WHITE)
+        hotkeys_status = "ON" if self.hotkeys_enabled else "OFF"
+        hotkeys_text = self.small_font.render(f"H - Hotkeys YUIOP: {hotkeys_status}", True, Config.YELLOW)
 
         # Logo centrado
         logo = getattr(self, "_menu_logo", None)
@@ -323,7 +343,8 @@ class GameEngine:
             title_y = 200
 
         self.screen.blit(start, (Config.SCREEN_WIDTH // 2 - start.get_width() // 2, title_y + 10))
-        self.screen.blit(quit_text, (Config.SCREEN_WIDTH // 2 - quit_text.get_width() // 2, title_y + 50))
+        self.screen.blit(hotkeys_text, (Config.SCREEN_WIDTH // 2 - hotkeys_text.get_width() // 2, title_y + 50))
+        self.screen.blit(quit_text, (Config.SCREEN_WIDTH // 2 - quit_text.get_width() // 2, title_y + 90))
 
     def render_game(self):
         """Renderiza el juego"""
@@ -517,7 +538,7 @@ class GameEngine:
 
         pause_text = self.font.render("PAUSA", True, Config.YELLOW)
         resume = self.small_font.render("R - Reanudar", True, Config.WHITE)
-        toggle = self.small_font.render("P - Pausar/Reanudar", True, Config.WHITE)
+        toggle = self.small_font.render("ESC - Pausar/Reanudar", True, Config.WHITE)
         menu = self.small_font.render("M - Menú Principal", True, Config.WHITE)
 
         self.screen.blit(pause_text, (Config.SCREEN_WIDTH // 2 - pause_text.get_width() // 2, 250))
@@ -724,19 +745,51 @@ class GameEngine:
             if self.voice_handler:
                 spell_name = self.voice_handler.text_to_spell(text.lower())
                 if spell_name:
-                    spell = self.spells.cast_spell(spell_name)
-                    # animación de manos al castear si se lanzó algo
-                    if spell:
-                        try:
-                            if hasattr(self, 'hud_hands') and self.hud_hands is not None:
-                                self.hud_hands.trigger_cast()
-                        except Exception:
-                            pass
-                        # Flash verde si es curación
-                        if spell_name == "healing":
-                            self.heal_flash_timer = self.heal_flash_duration
+                    self._cast_spell(spell_name)
         except Exception:
             pass
+
+    def _cast_spell(self, spell_name: str):
+        """Castea un hechizo y sincroniza HUD/overlays."""
+        if not spell_name:
+            return
+        try:
+            spell = self.spells.cast_spell(spell_name)
+        except Exception:
+            return
+        if not spell:
+            return
+        try:
+            if hasattr(self, 'hud_hands') and self.hud_hands is not None:
+                self.hud_hands.trigger_cast()
+        except Exception:
+            pass
+        if spell_name == "healing":
+            self.heal_flash_timer = self.heal_flash_duration
+
+    def _handle_spell_hotkeys(self):
+        """Castea hechizos al presionar Y/U/I/O/P (una vez por pulsación)."""
+        if not self.hotkeys_enabled or not self._spell_hotkeys:
+            return
+        keys = pygame.key.get_pressed()
+        for key_code, spell_name in self._spell_hotkeys.items():
+            is_down = keys[key_code]
+            was_down = self._hotkey_down.get(key_code, False)
+            if is_down and not was_down:
+                self._cast_spell(spell_name)
+            self._hotkey_down[key_code] = is_down
+
+    def _build_spell_hotkeys(self):
+        """Convierte nombres de tecla en códigos de pygame."""
+        mapping = {}
+        raw = getattr(Config, "SPELL_HOTKEYS", {}) or {}
+        for key_name, spell_name in raw.items():
+            key_attr = f"K_{str(key_name).lower()}"
+            key_code = getattr(pygame, key_attr, None)
+            if key_code is None:
+                continue
+            mapping[key_code] = spell_name
+        return mapping
 
     def _draw_heal_overlay(self):
         """Overlay verdoso corto al curar."""
