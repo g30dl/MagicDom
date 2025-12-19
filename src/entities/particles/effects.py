@@ -11,11 +11,22 @@ from .particle import Particle
 class ParticleManager:
     def __init__(self):
         self.particles: List[Particle] = []
+        self.damage_numbers: List[dict] = []
 
     def update(self, dt: float):
         for p in list(self.particles):
             p.update(dt)
         self.particles = [p for p in self.particles if p.alive]
+        # Actualizar daño flotante
+        for dn in list(self.damage_numbers):
+            dn["ttl"] -= dt
+            dn["y"] -= 25 * dt  # movimiento hacia arriba
+            dn["alpha"] = max(0, int(255 * (dn["ttl"] / dn["max_ttl"])))
+        self.damage_numbers = [d for d in self.damage_numbers if d["ttl"] > 0 and d["alpha"] > 0]
+        # Evitar crecer sin control
+        if len(self.particles) > Config.MAX_PARTICLES:
+            overflow = len(self.particles) - Config.MAX_PARTICLES
+            del self.particles[0:overflow]
         # Evitar crecer sin control
         if len(self.particles) > Config.MAX_PARTICLES:
             overflow = len(self.particles) - Config.MAX_PARTICLES
@@ -45,9 +56,24 @@ class ParticleManager:
             life = 0.2 + random.random() * 0.3
             self._append_particle(Particle(x, y, vx, vy, color=color, lifetime=life, size=size))
 
+    def spawn_damage_number(self, x: float, y: float, amount: float):
+        """Crea un número flotante de daño en el mundo."""
+        dn = {
+            "x": x,
+            "y": y,
+            "value": int(amount),
+            "ttl": 0.8,
+            "max_ttl": 0.8,
+            "alpha": 255,
+        }
+        self.damage_numbers.append(dn)
+
     def _append_particle(self, particle: Particle):
         """Append con trim en caso de overflow para proteger FPS."""
         self.particles.append(particle)
         if len(self.particles) > Config.MAX_PARTICLES:
             overflow = len(self.particles) - Config.MAX_PARTICLES
             del self.particles[0:overflow]
+
+    def get_damage_numbers(self):
+        return self.damage_numbers

@@ -84,6 +84,9 @@ class Renderer:
 
         for item in render_queue:
             self._draw_render_item(item)
+        # Guardar rayos para proyecciones externas (p.ej. damage numbers)
+        self._last_rays = rays
+        self._last_horizon = horizon
 
     def _load_sky_texture(self):
         """Carga y escala la textura de cielo si existe."""
@@ -334,6 +337,10 @@ class Renderer:
         except Exception:
             pass
 
+    def get_last_rays(self):
+        """Devuelve los últimos rayos calculados para proyecciones externas."""
+        return getattr(self, "_last_rays", None), getattr(self, "_last_horizon", None)
+
     def _gather_spell_commands(self, player, spells, horizon, rays):
         commands = []
         if not spells or not rays:
@@ -502,7 +509,7 @@ class Renderer:
         
         pygame.draw.circle(
             minimap_surface,
-            wall_color,
+            Config.RED,
             (player_map_x, player_map_y),
             4
         )
@@ -512,7 +519,7 @@ class Renderer:
         end_y = player_map_y + int(math.sin(player.angle) * dir_length)
         pygame.draw.line(
             minimap_surface,
-            wall_color,
+            Config.RED,
             (player_map_x, player_map_y),
             (end_x, end_y),
             2

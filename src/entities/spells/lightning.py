@@ -69,6 +69,9 @@ class Lightning(SpellBase):
             if (dx * dx + dy * dy) <= radius_sq:
                 try:
                     enemy.take_damage(self.damage, damage_type=self.name)
+                    particles = context.get("particles")
+                    if particles:
+                        particles.spawn_damage_number(enemy.x, enemy.y, self.damage)
                 except Exception:
                     pass
 

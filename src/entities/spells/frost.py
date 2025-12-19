@@ -66,6 +66,7 @@ class Frost(SpellBase):
             pass
         particles = context.get("particles")
         if particles:
+            particles.spawn_damage_number(enemy.x, enemy.y, self.damage)
             particles.spawn_spark(self.x, self.y, color=self.color, count=12)
         snd = context.get("sound")
         if snd:

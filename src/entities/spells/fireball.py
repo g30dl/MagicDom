@@ -91,6 +91,7 @@ class Fireball(SpellBase):
             pass
         particles = context.get('particles')
         if particles is not None:
+            particles.spawn_damage_number(enemy.x, enemy.y, self.damage)
             particles.spawn_explosion(self.x, self.y, color=(255, 80, 40))
         snd = context.get('sound')
         if snd:

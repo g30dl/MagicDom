@@ -287,13 +287,6 @@ class GameEngine:
             self.render_game_over()
         elif state == GameState.VICTORY:
             self.render_victory()
-        # HUD debug ligero: FPS arriba izquierda
-        try:
-            fps_text = self.small_font.render(f"FPS: {int(self.clock.get_fps())}", True, Config.WHITE)
-            self.screen.blit(fps_text, (Config.SCREEN_WIDTH - fps_text.get_width() - 10, 10))
-        except Exception:
-            pass
-
     def render_menu(self):
         """Renderiza el menú principal"""
         title = self.font.render("MAGE ARENA 3D", True, Config.YELLOW)
@@ -332,13 +325,19 @@ class GameEngine:
         except Exception:
             pass
 
+        # Números de daño flotantes
+        try:
+            self._draw_damage_numbers()
+        except Exception:
+            pass
+
         # Renderizar minimap (útil para debug)
         try:
             scale = 5
             map_w = len(self.renderer.raycaster.map[0]) * scale
             map_h = len(self.renderer.raycaster.map) * scale
             pos_x = max(0, Config.SCREEN_WIDTH - map_w - 10)
-            pos_y = max(0, Config.SCREEN_HEIGHT - map_h - 10)
+            pos_y = 10  # mostrar minimapa arriba
             self.renderer.render_minimap(
                 self.player, position=(pos_x, pos_y), scale=scale,
                 spells=self.spells.get_active_spells(),
@@ -810,3 +809,37 @@ class GameEngine:
             pass
         bg.blit(text, (pad, pad))
         self.screen.blit(bg, (Config.SCREEN_WIDTH - bg.get_width() - 16, Config.SCREEN_HEIGHT - 80))
+
+    def _draw_damage_numbers(self):
+        """Dibuja números de daño flotantes sobre el mundo."""
+        if not hasattr(self.renderer, "get_last_rays"):
+            return
+        rays, horizon = self.renderer.get_last_rays()
+        if not rays or horizon is None:
+            return
+        numbers = getattr(self.particles, "get_damage_numbers", lambda: [])()
+        if not numbers:
+            return
+        for dn in numbers:
+            dx = dn["x"] - self.player.x
+            dy = dn["y"] - self.player.y
+            distance = max(1.0, math.hypot(dx, dy))
+            angle_to = math.atan2(dy, dx)
+            angle_diff = (angle_to - self.player.angle + math.pi) % (2 * math.pi) - math.pi
+            if abs(angle_diff) > Config.HALF_FOV:
+                continue
+            ray_index_f = (angle_diff + Config.HALF_FOV) / Config.DELTA_ANGLE
+            ray_index = int(max(0, min(Config.NUM_RAYS - 1, ray_index_f)))
+            wall_dist = rays[ray_index].get("distance", 0)
+            if distance > wall_dist:
+                continue
+            sprite_h = (Config.TILE_SIZE * Config.SCREEN_HEIGHT) / distance
+            screen_x = int((ray_index_f / Config.NUM_RAYS) * Config.SCREEN_WIDTH)
+            screen_y = int(horizon - sprite_h * 0.5)
+            alpha = max(0, min(255, dn.get("alpha", 255)))
+            txt = self.small_font.render(str(dn.get("value", 0)), True, (255, 220, 120))
+            try:
+                txt.set_alpha(alpha)
+            except Exception:
+                pass
+            self.screen.blit(txt, (screen_x - txt.get_width() // 2, screen_y))
