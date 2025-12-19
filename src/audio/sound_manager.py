@@ -58,7 +58,7 @@ class SoundManager:
         sound_files = {
             "fireball": "fire.wav",
             "hit": "fire.wav",
-            "frost": "fire.wav",
+            "frost": "freeze.mp3",
             "lightning": "lightning.mp3",
             "healing": "heal.wav",
             "heal": "heal.wav",
@@ -92,6 +92,10 @@ class SoundManager:
             "cyber_demon_hit": [
                 os.path.join("assets", "music", "Cyber_demon", "hit.wav"),
                 os.path.join("assets", "music", "cyber_demon", "hit.wav"),
+            ],
+            "cyber_demon_attack": [
+                os.path.join("assets", "music", "Cyber_demon", "attack.wav"),
+                os.path.join("assets", "music", "cyber_demon", "attack.wav"),
             ],
         }
         for name, paths in enemy_sfx_candidates.items():

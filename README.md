@@ -55,3 +55,10 @@ Si no hay microfono o no hay conexion, el juego sigue corriendo pero la UI mostr
 ## Notas utiles
 - Ajusta constantes (FOV, velocidad, volumenes, hechizos) en `src/game/config.py`.
 - Los efectos de sonido o musica son opcionales; si faltan archivos, `SoundManager` muestra advertencias pero no detiene el juego.
+
+## Créditos de música/sonido
+Music by <a href="https://pixabay.com/users/astralsynthesizer-50776509/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=358772">Sarah H</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=358772">Pixabay</a>
+Music by <a href="https://pixabay.com/es/users/dragon-studio-38165424/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=386163">DRAGON-STUDIO</a> from <a href="https://pixabay.com/sound-effects//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=386163">Pixabay</a>
+Sound Effect by <a href="https://pixabay.com/es/users/yodguard-12455005/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=378606">yodguard</a> from <a href="https://pixabay.com/sound-effects//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=378606">Pixabay</a>
+Sound Effect by <a href="https://pixabay.com/users/astralsynthesizer-50776509/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=358772">Sarah H</a> from <a href="https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=358772">Pixabay</a>
+Sound Effect by <a href="https://pixabay.com/es/users/dragon-studio-38165424/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=386163">DRAGON-STUDIO</a> from <a href="https://pixabay.com/sound-effects//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=386163">Pixabay</a>

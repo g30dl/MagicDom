@@ -40,12 +40,16 @@ DEFAULT_MAP = [
  
 # Mensajes asociados a carteles (tile tipo 5)
 SIGN_TEXTS = {
-    (1, 0): "Para invocar hechizos prueba diciendolos en voz alta. Utiliza fuego para destruir la paredes.",
+    (1, 0): "Invoca hechizos mencionando su nombre. Destruye paredes con fuego (“bola de fuego”,"
+    " “fuego”, “fireball” )",
     (0, 5): "¡Bienvenido a MagicDom!. Usa WASD + mouse para moverte",
     (6, 1): "Algunos enemigos son vulnerables a hechizos específicos.",
-    (4, 3): "Utiliza heal o curar para restaurar tu salud si lo necesitas.",
-    (4, 4): "Puedes ir más rapido utilizando un hechizo de velocidad.",
-    (4, 5): "a",
+    (4, 3): "Utiliza Heal (curar”, “heal”, “healing) para restaurar tu salud si "
+    "lo necesitas. Prueba yendo más rapido con velocidad (“velocidad”, “rapidez”, “speed”)",
+    (4, 4): "Congela (“hielo”, “congelar”, “freeze”, “frost” ) a tus enemigos con hielo "
+    "para ralentizarlos.",
+    (4, 5): "Tira rayos (“rayo”, “trueno”, “relámpago”, “lightning”) para ser mas "
+    "poderoso contra enemigos en grupo",
 
 }
 

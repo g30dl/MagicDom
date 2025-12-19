@@ -74,7 +74,8 @@ class Config:
         "rayo": "lightning",
         "trueno": "lightning",
         "lightning": "lightning",
-        "relámpago": "lightning"
+        "relámpago": "lightning",
+        "es hora de morir": "easter_kill",
     }
     
     # Fases del juego

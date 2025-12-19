@@ -286,6 +286,9 @@ class Renderer:
             if surface is not None:
                 try:
                     self.screen.blit(surface, (int(item.get("x", 0)), int(item.get("y", 0))))
+                    boss = item.get("boss_bar")
+                    if boss:
+                        self._draw_boss_bar(surface, boss, item.get("x", 0), item.get("y", 0))
                     return
                 except Exception:
                     pass
@@ -310,6 +313,26 @@ class Renderer:
                 pygame.draw.rect(self.screen, color, (x - w // 2, y_top, w, max(1, y_bottom - y_top)))
             except Exception:
                 pass
+
+    def _draw_boss_bar(self, surface, bar_data, sprite_x, sprite_y):
+        """Dibuja barra de vida encima del boss."""
+        try:
+            ratio = max(0.0, min(1.0, bar_data.get("ratio", 0)))
+        except Exception:
+            return
+        width = max(40, int(surface.get_width() * 0.8))
+        height = 8
+        x = int(sprite_x + (surface.get_width() - width) / 2)
+        y = int(sprite_y - 12)
+        bg_color = (20, 20, 20)
+        fg_color = (40, 200, 60)
+        border_color = (200, 200, 200)
+        try:
+            pygame.draw.rect(self.screen, bg_color, (x, y, width, height))
+            pygame.draw.rect(self.screen, fg_color, (x + 2, y + 2, int((width - 4) * ratio), height - 4))
+            pygame.draw.rect(self.screen, border_color, (x, y, width, height), 1)
+        except Exception:
+            pass
 
     def _gather_spell_commands(self, player, spells, horizon, rays):
         commands = []
@@ -413,7 +436,7 @@ class Renderer:
                 draw_x = screen_x - scaled.get_width() // 2
                 draw_y = horizon - scaled.get_height() // 2
 
-                commands.append({
+                cmd = {
                     "type": "sprite",
                     "distance": distance,
                     "surface": scaled,
@@ -421,7 +444,16 @@ class Renderer:
                     "y": draw_y,
                     "width": scaled.get_width(),
                     "height": scaled.get_height(),
-                })
+                }
+                boss_bar = getattr(enemy, "get_boss_bar", None)
+                if boss_bar:
+                    try:
+                        bar = enemy.get_boss_bar()
+                        if bar:
+                            cmd["boss_bar"] = bar
+                    except Exception:
+                        pass
+                commands.append(cmd)
             except Exception:
                 continue
         return commands

@@ -56,7 +56,7 @@ class Frost(SpellBase):
             particles.spawn_spark(self.x, self.y, color=self.color, count=8)
         snd = context.get("sound")
         if snd:
-            snd.play_sfx("hit")
+            snd.play_sfx("frost")
         self.alive = False
 
     def on_hit_enemy(self, enemy, context):
@@ -69,5 +69,5 @@ class Frost(SpellBase):
             particles.spawn_spark(self.x, self.y, color=self.color, count=12)
         snd = context.get("sound")
         if snd:
-            snd.play_sfx("hit")
+            snd.play_sfx("frost")
         self.alive = False

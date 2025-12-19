@@ -529,6 +529,8 @@ class Enemy:
         print(f"Enemigo {self.type} ataca. Daño: {self.damage}")
         if self.type == "rockbad":
             self._play_sound("rockybad_attack")
+        elif self.type == "cyber_demon":
+            self._play_sound("cyber_demon_attack")
 
     def take_damage(self, damage, damage_type=None):
         """Recibe daño y activa animación de dolor."""
@@ -568,6 +570,17 @@ class Enemy:
 
     def get_health_percentage(self):
         return self.health / self.max_health if self.max_health > 0 else 0
+
+    def get_boss_bar(self):
+        """Devuelve datos para barra de vida del boss (si aplica)."""
+        if not getattr(self, "is_boss", False) or not self.alive:
+            return None
+        return {
+            "x": self.x,
+            "y": self.y,
+            "ratio": self.get_health_percentage(),
+            "radius": self.collision_radius,
+        }
 
     def is_renderable(self):
         if self.state == "death":

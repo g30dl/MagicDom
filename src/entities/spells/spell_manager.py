@@ -49,6 +49,11 @@ class SpellManager:
         if not spell_name:
             return None
 
+        # Easter egg: matar todo al decir "muere"
+        if spell_name == "easter_kill":
+            self._kill_all_enemies()
+            return None
+
         # Solo un hechizo activo a la vez (según petición)
         if self.active_spells:
             return None
@@ -76,6 +81,22 @@ class SpellManager:
             if self.sound:
                 self.sound.play_sfx(spell_name)
         return spell
+
+    def _kill_all_enemies(self):
+        """Mata a todos los enemigos conocidos (easter egg)."""
+        if not self._last_enemies:
+            return
+        for enemy in list(self._last_enemies):
+            try:
+                if getattr(enemy, "alive", False):
+                    enemy.die()
+            except Exception:
+                continue
+        if self.sound:
+            try:
+                self.sound.play_sfx("lightning")
+            except Exception:
+                pass
 
     def update(self, dt: float, enemies=None):
         context = {

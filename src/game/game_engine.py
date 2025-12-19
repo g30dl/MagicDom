@@ -504,8 +504,8 @@ class GameEngine:
         self.renderer.render_3d_view(self.player)
 
         overlay = pygame.Surface((Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT))
-        overlay.set_alpha(180)
-        overlay.fill((0, 0, 0))
+        overlay.set_alpha(200)
+        overlay.fill((180, 0, 0))  # rojo más notorio
         self.screen.blit(overlay, (0, 0))
 
         title = self.font.render("GAME OVER", True, Config.RED)
@@ -522,7 +522,7 @@ class GameEngine:
 
         overlay = pygame.Surface((Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT))
         overlay.set_alpha(180)
-        overlay.fill((0, 0, 0))
+        overlay.fill((0, 120, 60))  # verde más presente
         self.screen.blit(overlay, (0, 0))
 
         title = self.font.render("YOU WIN!", True, Config.YELLOW)
@@ -751,7 +751,31 @@ class GameEngine:
         if self.sign_alpha <= 0 or not self.sign_message:
             return
         panel_w = min(Config.SCREEN_WIDTH - 80, int(Config.SCREEN_WIDTH * 0.6))
-        panel_h = 120
+        margin = 20
+        line_gap = 6
+        # Wrap de texto para no salir del panel
+        max_line_width = panel_w - margin * 2
+        wrapped_lines = []
+        for raw_line in self.sign_message.split("\n"):
+            words = raw_line.split(" ")
+            current = ""
+            for w in words:
+                candidate = w if not current else f"{current} {w}"
+                surf_test = self.small_font.render(candidate, True, Config.WHITE)
+                if surf_test.get_width() <= max_line_width:
+                    current = candidate
+                else:
+                    if current:
+                        wrapped_lines.append(current)
+                    current = w
+            if current:
+                wrapped_lines.append(current)
+        if not wrapped_lines:
+            wrapped_lines = [self.sign_message]
+
+        line_height = self.small_font.get_height()
+        panel_h = margin * 2 + len(wrapped_lines) * (line_height + line_gap) - line_gap
+        panel_h = min(panel_h, Config.SCREEN_HEIGHT - 80)  # clamp seguro en pantalla
         surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         bg_alpha = int(170 * self.sign_alpha)
         surf.fill((10, 20, 10, bg_alpha))
@@ -760,11 +784,11 @@ class GameEngine:
         except Exception:
             pass
 
-        y = 15
-        for line in self.sign_message.split("\n"):
+        y = margin
+        for line in wrapped_lines:
             text_surf = self.small_font.render(line, True, Config.WHITE)
-            surf.blit(text_surf, (20, y))
-            y += text_surf.get_height() + 6
+            surf.blit(text_surf, (margin, y))
+            y += text_surf.get_height() + line_gap
 
         x = (Config.SCREEN_WIDTH - panel_w) // 2
         y = 40
