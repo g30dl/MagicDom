@@ -75,7 +75,7 @@ class Config:
         "trueno": "lightning",
         "lightning": "lightning",
         "relámpago": "lightning",
-        "es hora de morir": "easter_kill",
+        "matalos a todos": "easter_kill",
     }
     
     # Fases del juego

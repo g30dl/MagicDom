@@ -289,13 +289,41 @@ class GameEngine:
             self.render_victory()
     def render_menu(self):
         """Renderiza el menú principal"""
-        title = self.font.render("MAGE ARENA 3D", True, Config.YELLOW)
         start = self.small_font.render("Presiona ENTER para jugar", True, Config.WHITE)
         quit_text = self.small_font.render("Presiona ESC para salir", True, Config.WHITE)
 
-        self.screen.blit(title, (Config.SCREEN_WIDTH // 2 - title.get_width() // 2, 200))
-        self.screen.blit(start, (Config.SCREEN_WIDTH // 2 - start.get_width() // 2, 350))
-        self.screen.blit(quit_text, (Config.SCREEN_WIDTH // 2 - quit_text.get_width() // 2, 400))
+        # Logo centrado
+        logo = getattr(self, "_menu_logo", None)
+        if logo is None:
+            try:
+                import pygame
+                path = os.path.join("assets", "textures", "logo.png")
+                if os.path.exists(path):
+                    logo = pygame.image.load(path).convert_alpha()
+                    # Escalar si es grande (limitar a 50% ancho, 35% alto de pantalla)
+                    max_w = int(Config.SCREEN_WIDTH * 0.5)
+                    max_h = int(Config.SCREEN_HEIGHT * 0.35)
+                    if logo.get_width() > max_w or logo.get_height() > max_h:
+                        ratio = min(max_w / logo.get_width(), max_h / logo.get_height())
+                        logo = pygame.transform.smoothscale(
+                            logo,
+                            (int(logo.get_width() * ratio), int(logo.get_height() * ratio))
+                        )
+                self._menu_logo = logo
+            except Exception:
+                self._menu_logo = None
+
+        if logo:
+            self.screen.blit(logo, (
+                Config.SCREEN_WIDTH // 2 - logo.get_width() // 2,
+                120
+            ))
+            title_y = 120 + logo.get_height() + 10
+        else:
+            title_y = 200
+
+        self.screen.blit(start, (Config.SCREEN_WIDTH // 2 - start.get_width() // 2, title_y + 10))
+        self.screen.blit(quit_text, (Config.SCREEN_WIDTH // 2 - quit_text.get_width() // 2, title_y + 50))
 
     def render_game(self):
         """Renderiza el juego"""
