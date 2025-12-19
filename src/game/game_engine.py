@@ -287,6 +287,12 @@ class GameEngine:
             self.render_game_over()
         elif state == GameState.VICTORY:
             self.render_victory()
+        # HUD debug ligero: FPS arriba izquierda
+        try:
+            fps_text = self.small_font.render(f"FPS: {int(self.clock.get_fps())}", True, Config.WHITE)
+            self.screen.blit(fps_text, (Config.SCREEN_WIDTH - fps_text.get_width() - 10, 10))
+        except Exception:
+            pass
 
     def render_menu(self):
         """Renderiza el menú principal"""
@@ -328,13 +334,18 @@ class GameEngine:
 
         # Renderizar minimap (útil para debug)
         try:
+            scale = 5
+            map_w = len(self.renderer.raycaster.map[0]) * scale
+            map_h = len(self.renderer.raycaster.map) * scale
+            pos_x = max(0, Config.SCREEN_WIDTH - map_w - 10)
+            pos_y = max(0, Config.SCREEN_HEIGHT - map_h - 10)
             self.renderer.render_minimap(
-                self.player, position=(10, 10), scale=5,
+                self.player, position=(pos_x, pos_y), scale=scale,
                 spells=self.spells.get_active_spells(),
                 particles=self.particles.get_particles(),
             )
         except Exception:
-            self.renderer.render_minimap(self.player, position=(10, 10), scale=5)
+            self.renderer.render_minimap(self.player, position=(Config.SCREEN_WIDTH - 110, Config.SCREEN_HEIGHT - 110), scale=5)
 
         # Renderizar HUD simple
         health_text = self.health_font.render(
@@ -661,6 +672,8 @@ class GameEngine:
             GameState.VICTORY,
         ):
             desired = "playing_theme" if "playing_theme" in tracks else "background"
+            if state == GameState.VICTORY and "victory" in tracks:
+                desired = "victory"
 
         if not desired:
             return

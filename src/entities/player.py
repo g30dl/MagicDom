@@ -50,19 +50,20 @@ class Player:
 
     def check_collision_circle(self, x, y):
         """
-        Verifica colisión usando el radio del jugador.
-        Chequea múltiples puntos alrededor del círculo de colisión.
+        Verifica colisión usando el radio del jugador con quick-rejection
+        y 4 puntos cardinales (menos coste que 8 puntos).
         """
-        check_points = [
-            (x + self.collision_radius, y),
-            (x - self.collision_radius, y),
-            (x, y + self.collision_radius),
-            (x, y - self.collision_radius),
-            (x + self.collision_radius * 0.7, y + self.collision_radius * 0.7),
-            (x - self.collision_radius * 0.7, y + self.collision_radius * 0.7),
-            (x + self.collision_radius * 0.7, y - self.collision_radius * 0.7),
-            (x - self.collision_radius * 0.7, y - self.collision_radius * 0.7),
-        ]
+        # Tile central bloqueado => colisión directa
+        if self.check_collision(x, y):
+            return True
+
+        r = self.collision_radius
+        check_points = (
+            (x + r, y),
+            (x - r, y),
+            (x, y + r),
+            (x, y - r),
+        )
 
         for px, py in check_points:
             if self.check_collision(px, py):

@@ -16,10 +16,10 @@ class VoiceHandler:
         self._stop_event = threading.Event()
         self._thread = None
 
-        # Ajustar para ruido ambiente
+        # Ajustar para ruido ambiente (rápido)
         with self.microphone as source:
             print("Calibrando micrófono...")
-            self.recognizer.adjust_for_ambient_noise(source, duration=1)
+            self.recognizer.adjust_for_ambient_noise(source, duration=0.25)
 
     def listen_for_spell(self):
         """
@@ -55,7 +55,7 @@ class VoiceHandler:
             print(f"Error en reconocimiento de voz: {e}")
             return None
 
-    def start_continuous_listening(self, on_text_callback, phrase_time_limit=3):
+    def start_continuous_listening(self, on_text_callback, phrase_time_limit=1.5):
         """
         Inicia un hilo en segundo plano que escucha continuamente y llama
         a `on_text_callback(texto)` cada vez que reconoce algo.
@@ -67,6 +67,8 @@ class VoiceHandler:
         self._stop_event.clear()
 
         def _worker():
+            backoff = 0.5  # segundos
+            max_backoff = 4.0
             while not self._stop_event.is_set():
                 try:
                     with self.microphone as source:
@@ -80,19 +82,25 @@ class VoiceHandler:
                             audio, language=Config.VOICE_LANGUAGE
                         )
                         if text:
-                            on_text_callback(text)
+                            try:
+                                on_text_callback(text)
+                            except Exception:
+                                pass
+                        backoff = 0.5  # reset backoff en respuesta exitosa
                     except sr.UnknownValueError:
                         # silencio o no entendible — ignorar
                         pass
                     except sr.RequestError as e:
                         print(f"[Voz] Error del servicio: {e}")
-                        time.sleep(0.5)
+                        time.sleep(backoff)
+                        backoff = min(max_backoff, backoff * 2)
                 except sr.WaitTimeoutError:
                     # No hubo audio dentro del timeout; seguir intentando
                     continue
                 except Exception as e:
                     print(f"[Voz] Error escuchando: {e}")
-                    time.sleep(0.5)
+                    time.sleep(backoff)
+                    backoff = min(max_backoff, backoff * 2)
 
         self._thread = threading.Thread(target=_worker, daemon=True)
         self._thread.start()

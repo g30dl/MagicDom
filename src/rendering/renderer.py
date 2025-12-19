@@ -36,6 +36,9 @@ class Renderer:
         self._gradient_cache = {}
         self.skybox = self._load_skybox()
         self.sky_surface = self._load_sky_texture()  # fallback simple
+        # Cache agresiva de columnas escaladas para evitar reescalar por frame
+        self._column_cache = {}
+        self._column_cache_limit = 8000  # entradas max antes de limpiar (protege memoria)
 
     def _compute_horizon(self, player):
         # Sin pitch: horizonte fijo en el centro de pantalla
@@ -140,6 +143,25 @@ class Renderer:
         except Exception:
             return False
 
+    def _get_scaled_column(self, texture, tex_x, src_y, src_h, target_height):
+        """
+        Devuelve una columna escalada (1px ancho) cacheada por textura/offset/altura.
+        Reduce trabajo de escalado por frame.
+        """
+        key = (id(texture), int(tex_x), int(src_y), int(src_h), int(target_height))
+        cached = self._column_cache.get(key)
+        if cached is not None:
+            return cached
+        try:
+            column = texture.subsurface(int(tex_x), int(src_y), 1, int(src_h))
+            column = pygame.transform.scale(column, (self.column_width, int(target_height)))
+            if len(self._column_cache) >= self._column_cache_limit:
+                self._column_cache.clear()
+            self._column_cache[key] = column
+            return column
+        except Exception:
+            return None
+
     def _render_wall_column(self, ray, column_index, horizon):
         """Genera los datos de una columna de pared a partir de un rayo."""
         wall_type = ray.get("wall_type", 0)
@@ -169,44 +191,25 @@ class Renderer:
 
         # Caso 1: pared normal (lejos/media distancia)
         if proj_height < Config.SCREEN_HEIGHT:
-            try:
-                wall_column = texture.subsurface(tex_x, 0, 1, tex_height)
-            except ValueError:
-                return None
-            try:
-                wall_column = pygame.transform.scale(
-                    wall_column,
-                    (column_width, proj_height)
-                )
-            except Exception:
-                pass
+            wall_column = self._get_scaled_column(texture, tex_x, 0, tex_height, proj_height)
             y = int(horizon - proj_height // 2)
             column_height = proj_height
         else:
             texture_visible_height = tex_height * Config.SCREEN_HEIGHT / proj_height
             texture_visible_height = max(1, int(texture_visible_height))
             tex_y_start = (tex_height / 2) - (texture_visible_height / 2)
-            try:
-                wall_column = texture.subsurface(
-                    tex_x,
-                    int(tex_y_start),
-                    1,
-                    int(texture_visible_height)
-                )
-            except ValueError:
-                try:
-                    wall_column = texture.subsurface(tex_x, 0, 1, tex_height)
-                except ValueError:
-                    return None
-            try:
-                wall_column = pygame.transform.scale(
-                    wall_column,
-                    (column_width, Config.SCREEN_HEIGHT)
-                )
-            except Exception:
-                pass
+            wall_column = self._get_scaled_column(
+                texture,
+                tex_x,
+                tex_y_start,
+                texture_visible_height,
+                Config.SCREEN_HEIGHT
+            )
             y = 0
             column_height = Config.SCREEN_HEIGHT
+
+        if wall_column is None:
+            return None
 
         shade_factor = max(0.2, 1 - (distance / Config.MAX_DEPTH))
         if side == 1:
@@ -376,12 +379,12 @@ class Renderer:
             try:
                 dx = enemy.x - player.x
                 dy = enemy.y - player.y
-                distance = max(1.0, math.hypot(dx, dy))
-
                 angle_to = math.atan2(dy, dx)
                 angle_diff = (angle_to - player.angle + math.pi) % (2 * math.pi) - math.pi
                 if abs(angle_diff) > Config.HALF_FOV + 0.2:
                     continue
+
+                distance = max(1.0, math.hypot(dx, dy))
 
                 ray_index_f = (angle_diff + Config.HALF_FOV) / Config.DELTA_ANGLE
                 ray_index = int(max(0, min(Config.NUM_RAYS - 1, ray_index_f)))
@@ -439,24 +442,17 @@ class Renderer:
         minimap_surface = pygame.Surface(
             (len(self.raycaster.map[0]) * scale, len(self.raycaster.map) * scale)
         )
-        minimap_surface.fill(Config.BLACK)
-        minimap_surface.set_alpha(200)  # Semi-transparente
+        # Minimapa monocromático: fondo oscuro y paredes en blanco
+        minimap_surface.fill((15, 15, 15))
         
-        # Dibujar mapa
+        # Dibujar mapa (monocolor para todas las paredes)
+        wall_color = Config.WHITE
         for row in range(len(self.raycaster.map)):
             for col in range(len(self.raycaster.map[0])):
                 if self.raycaster.map[row][col] > 0:
-                    wall_type = self.raycaster.map[row][col]
-                    color = self.wall_colors.get(wall_type, Config.WHITE)
                     pygame.draw.rect(
                         minimap_surface,
-                        color,
-                        (col * scale, row * scale, scale, scale)
-                    )
-                else:
-                    pygame.draw.rect(
-                        minimap_surface,
-                        (20, 20, 20),
+                        wall_color,
                         (col * scale, row * scale, scale, scale)
                     )
         
@@ -466,7 +462,7 @@ class Renderer:
         collision_radius_scaled = int(player.collision_radius / Config.TILE_SIZE * scale)
         pygame.draw.circle(
             minimap_surface,
-            (100, 100, 255, 100),
+            wall_color,
             (player_map_x, player_map_y),
             collision_radius_scaled,
             1
@@ -474,7 +470,7 @@ class Renderer:
         
         pygame.draw.circle(
             minimap_surface,
-            Config.YELLOW,
+            wall_color,
             (player_map_x, player_map_y),
             4
         )
@@ -484,7 +480,7 @@ class Renderer:
         end_y = player_map_y + int(math.sin(player.angle) * dir_length)
         pygame.draw.line(
             minimap_surface,
-            Config.RED,
+            wall_color,
             (player_map_x, player_map_y),
             (end_x, end_y),
             2
@@ -499,12 +495,5 @@ class Renderer:
                 ParticleRenderer().render_on_minimap(minimap_surface, particles, scale)
         except Exception:
             pass
-        
-        pygame.draw.rect(
-            minimap_surface,
-            Config.WHITE,
-            (0, 0, minimap_surface.get_width(), minimap_surface.get_height()),
-            2
-        )
         
         self.screen.blit(minimap_surface, position)

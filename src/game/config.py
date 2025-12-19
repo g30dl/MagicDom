@@ -56,7 +56,7 @@ class Config:
     
     # Configuración de voz
     VOICE_LANGUAGE = "es-ES"  # Español
-    VOICE_TIMEOUT = 3  # Segundos de espera
+    VOICE_TIMEOUT = 1  # Segundos de espera (mas rapido)
     
     # Hechizos disponibles
     SPELLS = {
@@ -103,6 +103,9 @@ class Config:
     MUSIC_VOLUME = 0.3
     BACKGROUND_VOLUME_SCALE = 0.6  # baja la pista de background respecto al volumen general
     SFX_VOLUME = 0.7
+
+    # Límites y optimizaciones
+    MAX_PARTICLES = 500  # cap para no degradar FPS
 
     # HUD de manos (escala y posicionamiento)
     # - HEIGHT_RATIO: fracción del alto de pantalla usada para el sprite

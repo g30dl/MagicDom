@@ -74,7 +74,10 @@ class Fireball(SpellBase):
         # SFX
         snd = context.get('sound')
         if snd:
-            snd.play_sfx("hit")
+            if destroyed:
+                snd.play_sfx("romper_pared")
+            else:
+                snd.play_sfx("hit")
         self.alive = False
 
     def on_hit_enemy(self, enemy, context):

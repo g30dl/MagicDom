@@ -59,14 +59,15 @@ class SoundManager:
             "fireball": "fire.wav",
             "hit": "fire.wav",
             "frost": "fire.wav",
-            "lightning": "rayos.wav",
+            "lightning": "lightning.mp3",
             "healing": "heal.wav",
             "heal": "heal.wav",
-            "speed": "controller_button_press_2.wav",
-            "menu_click": "controller_button_press_2.wav",
+            "speed": "speed.wav",  # boost de velocidad
+            "romper_pared": "romper_pared.wav",
+            "menu_click": "clic.wav",
             "error": "controller_button_press_2.wav",
-            "death": "lost.wav",
-            "lost": "lost.wav",
+            "death": "death.wav",
+            "lost": "death.wav",
         }
 
         for name, filename in sound_files.items():
@@ -82,12 +83,20 @@ class SoundManager:
                 print(f"Advertencia: No se encontro {filepath}")
 
         # Efectos de enemigos ubicados en assets/music/<enemigo>/attack.*
-        enemy_sfx = {
-            "rockybad_attack": os.path.join("assets", "music", "rockybad", "attack.wav"),
-            "cyber_demon_hit": os.path.join("assets", "music", "Cyber_demon", "hit.wav"),
+        enemy_sfx_candidates = {
+            "rockybad_attack": [
+                os.path.join("assets", "music", "Rockbad", "attack.wav"),
+                os.path.join("assets", "music", "rockbad", "attack.wav"),
+                os.path.join("assets", "music", "rockybad", "attack.wav"),
+            ],
+            "cyber_demon_hit": [
+                os.path.join("assets", "music", "Cyber_demon", "hit.wav"),
+                os.path.join("assets", "music", "cyber_demon", "hit.wav"),
+            ],
         }
-        for name, filepath in enemy_sfx.items():
-            if os.path.exists(filepath):
+        for name, paths in enemy_sfx_candidates.items():
+            filepath = next((p for p in paths if os.path.exists(p)), None)
+            if filepath:
                 try:
                     self.sound_effects[name] = pygame.mixer.Sound(filepath)
                     self.sound_effects[name].set_volume(Config.SFX_VOLUME)
@@ -95,7 +104,7 @@ class SoundManager:
                 except Exception as e:
                     print(f"Error cargando {filepath}: {e}")
             else:
-                print(f"Advertencia: No se encontro {filepath}")
+                print(f"Advertencia: No se encontro ruta para {name}: {paths[0]}")
 
         base_music = {
             "background": os.path.join(music_path, "background.mp3"),
@@ -112,6 +121,7 @@ class SoundManager:
             "playing_theme": os.path.join(theme_path, "playing.mp3"),
             "playing": os.path.join(theme_path, "playing.mp3"),
             "background": os.path.join(theme_path, "playing.mp3"),
+            "victory": os.path.join(theme_path, "victory.mp3"),
         }
         for name, filepath in theme_music.items():
             self._register_music_track(name, filepath, override=True)
